@@ -233,3 +233,65 @@ def test_request_id_propagation(
         response.json()["error"]["request_id"]
         == request_id
     )
+
+def test_prepare_powerbi_authentication(
+    client,
+):
+    response = client.post(
+        "/api/v1/auth/powerbi/prepare",
+        json={
+            "tenant_id": "tenant-123",
+            "client_id": "client-123",
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["provider"] == "powerbi"
+
+    assert (
+        payload["authentication_flow"]
+        == "authorization_code_pkce"
+    )
+
+    assert (
+        payload["authority"]
+        == (
+            "https://login.microsoftonline.com/"
+            "tenant-123"
+        )
+    )
+
+    assert any(
+        "Workspace.Read.All" in scope
+        for scope in payload["scopes"]
+    )
+
+def test_prepare_fabric_authentication(
+    client,
+):
+    response = client.post(
+        "/api/v1/auth/fabric/prepare",
+        json={
+            "tenant_id": "tenant-123",
+            "client_id": "client-123",
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["provider"] == "fabric"
+
+    assert (
+        payload["authentication_flow"]
+        == "authorization_code_pkce"
+    )
+
+    assert any(
+        "Item.Read.All" in scope
+        for scope in payload["scopes"]
+    )
