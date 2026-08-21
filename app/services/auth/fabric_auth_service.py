@@ -1,9 +1,9 @@
-from app.clients.powerbi_client import PowerBIClient
+from app.clients.fabric_client import FabricClient
 
 
-class PowerBIAuthService:
+class FabricAuthService:
     def __init__(self) -> None:
-        self.client = PowerBIClient()
+        self.client = FabricClient()
 
     async def validate(
         self,

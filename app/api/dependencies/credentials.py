@@ -1,11 +1,15 @@
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import (
     HTTPAuthorizationCredentials,
     HTTPBearer,
 )
 
+from app.core.exceptions import (
+    InvalidAuthenticationSchemeError,
+    MissingAuthenticationCredentialsError,
+)
 
 bearer_scheme = HTTPBearer(
     auto_error=False,
@@ -19,15 +23,13 @@ async def get_bearer_token(
     ],
 ) -> str:
     if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication credentials are required.",
+        raise (
+            MissingAuthenticationCredentialsError()
         )
 
     if credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Bearer authentication is required.",
+        raise (
+            InvalidAuthenticationSchemeError()
         )
 
     return credentials.credentials

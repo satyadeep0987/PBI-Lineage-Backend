@@ -1,4 +1,4 @@
-import httpx
+from app.clients.provider_http_client import provider_get
 
 
 class PowerBIClient:
@@ -8,17 +8,13 @@ class PowerBIClient:
         self,
         access_token: str,
     ) -> bool:
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-        }
+        await provider_get(
+            provider="powerbi",
+            url=f"{self.BASE_URL}/groups",
+            access_token=access_token,
+            params={
+                "$top": 1,
+            },
+        )
 
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(30.0),
-        ) as client:
-            response = await client.get(
-                f"{self.BASE_URL}/groups",
-                headers=headers,
-                params={"$top": 1},
-            )
-
-        return response.is_success
+        return True

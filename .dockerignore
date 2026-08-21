@@ -32,3 +32,5 @@ tests
 logs
 
 README.md
+
+/local_fastapi_auth_test/

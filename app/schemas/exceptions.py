@@ -104,40 +104,9 @@ class UpstreamRequestError(AppException):
         super().__init__(
             code="UPSTREAM_REQUEST_FAILED",
             message=(
-                f"The request to {_provider_label(provider)} "
-                "could not be completed."
+                f"The request to {_provider_label(provider)} could not "
+                "be completed."
             ),
             status_code=status.HTTP_502_BAD_GATEWAY,
             provider=provider,
-        )
-
-class MissingAuthenticationCredentialsError(
-    AppException
-):
-    def __init__(self) -> None:
-        super().__init__(
-            code="AUTH_CREDENTIALS_REQUIRED",
-            message=(
-                "Authentication credentials "
-                "are required."
-            ),
-            status_code=(
-                status.HTTP_401_UNAUTHORIZED
-            ),
-        )
-
-
-class InvalidAuthenticationSchemeError(
-    AppException
-):
-    def __init__(self) -> None:
-        super().__init__(
-            code="AUTH_SCHEME_INVALID",
-            message=(
-                "Bearer authentication "
-                "is required."
-            ),
-            status_code=(
-                status.HTTP_401_UNAUTHORIZED
-            ),
         )
