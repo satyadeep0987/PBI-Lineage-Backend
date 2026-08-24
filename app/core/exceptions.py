@@ -203,3 +203,19 @@ class AuthenticationSessionExpiredError(
                 status.HTTP_401_UNAUTHORIZED
             ),
         )
+
+class ProviderResourceNotFoundError(AppException):
+    def __init__(
+        self,
+        provider: str,
+        resource: str,
+    ) -> None:
+        super().__init__(
+            code="RESOURCE_NOT_FOUND",
+            message=(
+                f"{_provider_label(provider)} "
+                f"{resource} was not found."
+            ),
+            status_code=status.HTTP_404_NOT_FOUND,
+            provider=provider,
+        )

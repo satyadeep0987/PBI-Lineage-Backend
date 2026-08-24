@@ -6,11 +6,6 @@ from app.api.v1 import (
     workspaces,
 )
 
-from app.core.auth_session import (
-    AUTH_SESSION_COOKIE,
-    AUTH_SESSION_MAX_AGE_SECONDS,
-)
-
 api_router = APIRouter()
 
 api_router.include_router(

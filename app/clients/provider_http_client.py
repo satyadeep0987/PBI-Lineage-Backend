@@ -9,6 +9,7 @@ from app.core.exceptions import (
     UpstreamRequestError,
     UpstreamTimeoutError,
     UpstreamUnavailableError,
+    ProviderResourceNotFoundError
 )
 
 DEFAULT_TIMEOUT_SECONDS = 30.0
@@ -45,11 +46,13 @@ async def provider_get(
     url: str,
     access_token: str,
     params: dict[str, Any] | None = None,
+    not_found_resource: str | None = None,
 ) -> httpx.Response:
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Accept": "application/json",
     }
+
 
     try:
         async with httpx.AsyncClient(
@@ -71,5 +74,14 @@ async def provider_get(
         response=response,
         provider=provider,
     )
+
+    if (
+        response.status_code == 404
+        and not_found_resource
+    ):
+        raise ProviderResourceNotFoundError(
+            provider=provider,
+            resource=not_found_resource,
+        )
 
     return response

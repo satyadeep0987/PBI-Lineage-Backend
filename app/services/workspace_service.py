@@ -1,9 +1,7 @@
 from typing import Any
 
 from app.clients.powerbi_client import PowerBIClient
-from app.core.exceptions import (
-    UpstreamInvalidResponseError,
-)
+from app.core.exceptions import UpstreamInvalidResponseError
 from app.schemas.workspace import (
     Workspace,
     WorkspaceListResponse,
@@ -30,8 +28,8 @@ class WorkspaceService:
         )
 
         workspaces = [
-            self._map_workspace(workspace)
-            for workspace in raw_workspaces
+            self._map_workspace(item)
+            for item in raw_workspaces
         ]
 
         return WorkspaceListResponse(
@@ -39,6 +37,23 @@ class WorkspaceService:
             count=len(workspaces),
             top=top,
             skip=skip,
+        )
+
+    async def get_workspace(
+        self,
+        *,
+        workspace_id: str,
+        access_token: str,
+    ) -> Workspace:
+        raw_workspace = (
+            await self.client.get_workspace(
+                workspace_id=workspace_id,
+                access_token=access_token,
+            )
+        )
+
+        return self._map_workspace(
+            raw_workspace
         )
 
     @staticmethod
