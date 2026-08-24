@@ -1,222 +1,302 @@
-from unittest.mock import AsyncMock
+from uuid import uuid4
 
-from app.core.exceptions import (
-    InsufficientPermissionsError,
-    InvalidAccessTokenError,
-    UpstreamRateLimitError,
+from app.core.auth_session import AUTH_SESSION_COOKIE
+from app.services.auth.device_auth_store import (
+    DeviceAuthSession,
+    delete_device_session,
+    save_device_session,
 )
-from app.services.auth.fabric_auth_service import (
-    FabricAuthService,
-)
-from app.services.auth.powerbi_auth_service import (
-    PowerBIAuthService,
+from app.services.auth.microsoft_device_auth_service import (
+    MicrosoftDeviceAuthService,
 )
 
-POWERBI_CONTEXT = {
-    "tenant_id": "test-tenant",
-    "client_id": "test-client",
-}
+
+def _create_session(
+    *,
+    status: str,
+    powerbi_connected: bool | None = None,
+    fabric_connected: bool | None = None,
+    error_message: str | None = None,
+) -> str:
+    session_id = str(uuid4())
+
+    session = DeviceAuthSession(
+        flow={},
+        tenant_id="test-tenant",
+        client_id="test-client",
+    )
+
+    session.status = status
+    session.powerbi_connected = powerbi_connected
+    session.fabric_connected = fabric_connected
+    session.error_message = error_message
+
+    save_device_session(
+        session_id,
+        session,
+    )
+
+    return session_id
 
 
-FABRIC_CONTEXT = {
-    "tenant_id": "test-tenant",
-    "client_id": "test-client",
-}
-
-
-AUTH_HEADERS = {
-    "Authorization": (
-        "Bearer fake-test-token"
-    ),
-}
-
-
-def test_powerbi_validation_success(
+def test_microsoft_device_start_success(
     client,
     monkeypatch,
 ):
-    validate_mock = AsyncMock(
-        return_value=True
-    )
+    async def fake_start(
+        self,
+        *,
+        tenant_id: str,
+        client_id: str,
+    ):
+        return (
+            "test-session-id",
+            {
+                "verification_uri": (
+                    "https://microsoft.com/devicelogin"
+                ),
+                "user_code": "TEST-CODE",
+                "message": "Authenticate with Microsoft.",
+                "expires_in": 900,
+            },
+        )
 
     monkeypatch.setattr(
-        PowerBIAuthService,
-        "validate",
-        validate_mock,
+        MicrosoftDeviceAuthService,
+        "start",
+        fake_start,
     )
 
+    client.cookies.clear()
+
     response = client.post(
-        "/api/v1/auth/powerbi/validate",
-        json=POWERBI_CONTEXT,
-        headers=AUTH_HEADERS,
+        "/api/v1/auth/microsoft/device/start",
+        json={
+            "tenant_id": "test-tenant",
+            "client_id": "test-client",
+        },
     )
 
     assert response.status_code == 200
 
     payload = response.json()
 
-    assert payload["authenticated"] is True
-    assert payload["provider"] == "powerbi"
+    assert payload["session_id"] == "test-session-id"
+    assert payload["user_code"] == "TEST-CODE"
+    assert payload["expires_in"] == 900
 
-
-def test_fabric_validation_success(
-    client,
-    monkeypatch,
-):
-    validate_mock = AsyncMock(
-        return_value=True
+    assert (
+        response.cookies.get(
+            AUTH_SESSION_COOKIE
+        )
+        == "test-session-id"
     )
 
-    monkeypatch.setattr(
-        FabricAuthService,
-        "validate",
-        validate_mock,
+    client.cookies.clear()
+
+
+def test_device_status_requires_session(
+    client,
+):
+    client.cookies.clear()
+
+    response = client.get(
+        "/api/v1/auth/microsoft/device/status"
+    )
+
+    assert response.status_code == 401
+
+
+def test_device_status_pending(
+    client,
+):
+    session_id = _create_session(
+        status="pending",
+    )
+
+    try:
+        client.cookies.clear()
+
+        client.cookies.set(
+            AUTH_SESSION_COOKIE,
+            session_id,
+        )
+
+        response = client.get(
+            "/api/v1/auth/microsoft/device/status"
+        )
+
+        assert response.status_code == 200
+
+        payload = response.json()
+
+        assert payload["status"] == "pending"
+
+    finally:
+        delete_device_session(session_id)
+        client.cookies.clear()
+
+
+def test_device_status_authenticated(
+    client,
+):
+    session_id = _create_session(
+        status="authenticated",
+        powerbi_connected=True,
+        fabric_connected=True,
+    )
+
+    try:
+        client.cookies.clear()
+
+        client.cookies.set(
+            AUTH_SESSION_COOKIE,
+            session_id,
+        )
+
+        response = client.get(
+            "/api/v1/auth/microsoft/device/status"
+        )
+
+        assert response.status_code == 200
+
+        payload = response.json()
+
+        assert payload["status"] == "authenticated"
+
+        assert (
+            payload["powerbi"]["connected"]
+            is True
+        )
+
+        assert (
+            payload["fabric"]["connected"]
+            is True
+        )
+
+    finally:
+        delete_device_session(session_id)
+        client.cookies.clear()
+
+
+def test_device_status_powerbi_connected_fabric_not_connected(
+    client,
+):
+    session_id = _create_session(
+        status="authenticated",
+        powerbi_connected=True,
+        fabric_connected=False,
+    )
+
+    try:
+        client.cookies.clear()
+
+        client.cookies.set(
+            AUTH_SESSION_COOKIE,
+            session_id,
+        )
+
+        response = client.get(
+            "/api/v1/auth/microsoft/device/status"
+        )
+
+        assert response.status_code == 200
+
+        payload = response.json()
+
+        assert payload["status"] == "authenticated"
+
+        assert (
+            payload["powerbi"]["connected"]
+            is True
+        )
+
+        assert (
+            payload["fabric"]["connected"]
+            is False
+        )
+
+    finally:
+        delete_device_session(session_id)
+        client.cookies.clear()
+
+
+def test_device_status_failed(
+    client,
+):
+    session_id = _create_session(
+        status="failed",
+        powerbi_connected=False,
+        fabric_connected=False,
+        error_message="Authentication failed.",
+    )
+
+    try:
+        client.cookies.clear()
+
+        client.cookies.set(
+            AUTH_SESSION_COOKIE,
+            session_id,
+        )
+
+        response = client.get(
+            "/api/v1/auth/microsoft/device/status"
+        )
+
+        assert response.status_code == 200
+
+        payload = response.json()
+
+        assert payload["status"] == "failed"
+
+        assert (
+            payload["message"]
+            == "Authentication failed."
+        )
+
+    finally:
+        delete_device_session(session_id)
+        client.cookies.clear()
+
+
+def test_logout_success(
+    client,
+):
+    session_id = _create_session(
+        status="authenticated",
+        powerbi_connected=True,
+        fabric_connected=True,
+    )
+
+    client.cookies.clear()
+
+    client.cookies.set(
+        AUTH_SESSION_COOKIE,
+        session_id,
     )
 
     response = client.post(
-        "/api/v1/auth/fabric/validate",
-        json=FABRIC_CONTEXT,
-        headers=AUTH_HEADERS,
+        "/api/v1/auth/microsoft/device/logout"
     )
 
     assert response.status_code == 200
 
     payload = response.json()
 
-    assert payload["authenticated"] is True
-    assert payload["provider"] == "fabric"
+    assert payload["status"] == "logged_out"
 
-
-def test_missing_authentication_credentials(
-    client,
-):
-    response = client.post(
-        "/api/v1/auth/powerbi/validate",
-        json=POWERBI_CONTEXT,
-    )
-
-    assert response.status_code == 401
-
-    payload = response.json()
-
-    assert (
-        payload["error"]["code"]
-        == "AUTH_CREDENTIALS_REQUIRED"
-    )
-
-    assert "request_id" in payload["error"]
-
-
-def test_invalid_powerbi_token(
-    client,
-    monkeypatch,
-):
-    validate_mock = AsyncMock(
-        side_effect=InvalidAccessTokenError(
-            "powerbi"
-        )
-    )
-
-    monkeypatch.setattr(
-        PowerBIAuthService,
-        "validate",
-        validate_mock,
-    )
-
-    response = client.post(
-        "/api/v1/auth/powerbi/validate",
-        json=POWERBI_CONTEXT,
-        headers=AUTH_HEADERS,
-    )
-
-    assert response.status_code == 401
-
-    payload = response.json()
-
-    assert (
-        payload["error"]["code"]
-        == "AUTH_TOKEN_INVALID"
-    )
-
-    assert (
-        payload["error"]["provider"]
-        == "powerbi"
-    )
-
-
-def test_fabric_insufficient_permissions(
-    client,
-    monkeypatch,
-):
-    validate_mock = AsyncMock(
-        side_effect=(
-            InsufficientPermissionsError(
-                "fabric"
-            )
-        )
-    )
-
-    monkeypatch.setattr(
-        FabricAuthService,
-        "validate",
-        validate_mock,
-    )
-
-    response = client.post(
-        "/api/v1/auth/fabric/validate",
-        json=FABRIC_CONTEXT,
-        headers=AUTH_HEADERS,
-    )
-
-    assert response.status_code == 403
-
-    payload = response.json()
-
-    assert (
-        payload["error"]["code"]
-        == "AUTH_INSUFFICIENT_PERMISSIONS"
-    )
-
-
-def test_powerbi_rate_limit(
-    client,
-    monkeypatch,
-):
-    validate_mock = AsyncMock(
-        side_effect=UpstreamRateLimitError(
-            provider="powerbi",
-            retry_after="30",
-        )
-    )
-
-    monkeypatch.setattr(
-        PowerBIAuthService,
-        "validate",
-        validate_mock,
-    )
-
-    response = client.post(
-        "/api/v1/auth/powerbi/validate",
-        json=POWERBI_CONTEXT,
-        headers=AUTH_HEADERS,
-    )
-
-    assert response.status_code == 429
-
-    assert (
-        response.headers["Retry-After"]
-        == "30"
-    )
+    client.cookies.clear()
 
 
 def test_request_id_propagation(
     client,
 ):
-    request_id = "frontend-test-123"
+    client.cookies.clear()
 
-    response = client.post(
-        "/api/v1/auth/powerbi/validate",
-        json=POWERBI_CONTEXT,
+    request_id = "auth-test-request-id"
+
+    response = client.get(
+        "/api/v1/auth/microsoft/device/status",
         headers={
             "X-Request-ID": request_id,
         },
@@ -227,71 +307,4 @@ def test_request_id_propagation(
     assert (
         response.headers["X-Request-ID"]
         == request_id
-    )
-
-    assert (
-        response.json()["error"]["request_id"]
-        == request_id
-    )
-
-def test_prepare_powerbi_authentication(
-    client,
-):
-    response = client.post(
-        "/api/v1/auth/powerbi/prepare",
-        json={
-            "tenant_id": "tenant-123",
-            "client_id": "client-123",
-        },
-    )
-
-    assert response.status_code == 200
-
-    payload = response.json()
-
-    assert payload["provider"] == "powerbi"
-
-    assert (
-        payload["authentication_flow"]
-        == "authorization_code_pkce"
-    )
-
-    assert (
-        payload["authority"]
-        == (
-            "https://login.microsoftonline.com/"
-            "tenant-123"
-        )
-    )
-
-    assert any(
-        "Workspace.Read.All" in scope
-        for scope in payload["scopes"]
-    )
-
-def test_prepare_fabric_authentication(
-    client,
-):
-    response = client.post(
-        "/api/v1/auth/fabric/prepare",
-        json={
-            "tenant_id": "tenant-123",
-            "client_id": "client-123",
-        },
-    )
-
-    assert response.status_code == 200
-
-    payload = response.json()
-
-    assert payload["provider"] == "fabric"
-
-    assert (
-        payload["authentication_flow"]
-        == "authorization_code_pkce"
-    )
-
-    assert any(
-        "Item.Read.All" in scope
-        for scope in payload["scopes"]
     )

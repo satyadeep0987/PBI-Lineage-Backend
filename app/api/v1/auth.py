@@ -1,46 +1,26 @@
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Cookie, HTTPException, Response
-
-from app.api.dependencies.credentials import (
-    get_powerbi_access_token,
-    get_fabric_access_token
-)
-
-from app.schemas.auth import (
-    AuthenticationResponse,
-    FabricAuthContext,
-    MicrosoftAuthPreparationResponse,
-    MicrosoftAuthRequest,
-    PowerBIAuthContext,
-    MicrosoftDeviceAuthRequest,
-    MicrosoftDeviceAuthStartResponse,
-    MicrosoftDeviceAuthStatusResponse,
-    ProviderTestResult,
-)
-from app.services.auth.fabric_auth_service import FabricAuthService
-from app.services.auth.microsoft_auth_service import (
-    MicrosoftAuthService,
-)
-from app.services.auth.powerbi_auth_service import PowerBIAuthService
-
-from app.services.auth.microsoft_device_auth_service import (
-    MicrosoftDeviceAuthService,
-)
+from fastapi import APIRouter, Cookie, Response
 
 from app.core.auth_session import (
     AUTH_SESSION_COOKIE,
     AUTH_SESSION_MAX_AGE_SECONDS,
 )
-
+from app.core.exceptions import (
+    AuthenticationSessionExpiredError,
+    AuthenticationSessionRequiredError,
+)
+from app.schemas.auth import (
+    MicrosoftDeviceAuthRequest,
+    MicrosoftDeviceAuthStartResponse,
+    MicrosoftDeviceAuthStatusResponse,
+    ProviderTestResult,
+)
 from app.services.auth.device_auth_store import (
     delete_device_session,
-    get_device_session
+    get_device_session,
 )
-
-from app.core.exceptions import (
-    AuthenticationSessionRequiredError,
-    AuthenticationSessionExpiredError
+from app.services.auth.microsoft_device_auth_service import (
+    MicrosoftDeviceAuthService,
 )
 
 router = APIRouter()
@@ -155,43 +135,43 @@ router = APIRouter()
 #         "cookie_value": cookie_value
 #     }
 
-@router.post(
-    "/microsoft/device/start",
-    response_model=MicrosoftDeviceAuthStartResponse,
-)
-async def start_microsoft_device_authentication(
-    request: MicrosoftDeviceAuthRequest,
-    response: Response,
-) -> MicrosoftDeviceAuthStartResponse:
-    service = MicrosoftDeviceAuthService()
+# @router.post(
+#     "/microsoft/device/start",
+#     response_model=MicrosoftDeviceAuthStartResponse,
+# )
+# async def start_microsoft_device_authentication(
+#     request: MicrosoftDeviceAuthRequest,
+#     response: Response,
+# ) -> MicrosoftDeviceAuthStartResponse:
+#     service = MicrosoftDeviceAuthService()
 
-    session_id, flow = await service.start(
-        tenant_id=request.tenant_id,
-        client_id=request.client_id,
-    )
+#     session_id, flow = await service.start(
+#         tenant_id=request.tenant_id,
+#         client_id=request.client_id,
+#     )
 
-    response.set_cookie(
-        key=AUTH_SESSION_COOKIE,
-        value=session_id,
-        max_age=AUTH_SESSION_MAX_AGE_SECONDS,
-        httponly=True,
-        secure=False,       # IMPORTANT for localhost HTTP
-        samesite="lax",
-        path="/",
-    )
+#     response.set_cookie(
+#         key=AUTH_SESSION_COOKIE,
+#         value=session_id,
+#         max_age=AUTH_SESSION_MAX_AGE_SECONDS,
+#         httponly=True,
+#         secure=False,       # IMPORTANT for localhost HTTP
+#         samesite="lax",
+#         path="/",
+#     )
 
-    return MicrosoftDeviceAuthStartResponse(
-        session_id=session_id,
-        verification_uri=flow["verification_uri"],
-        user_code=flow["user_code"],
-        message=flow["message"],
-        expires_in=int(
-            flow.get(
-                "expires_in",
-                900,
-            )
-        ),
-    )
+#     return MicrosoftDeviceAuthStartResponse(
+#         session_id=session_id,
+#         verification_uri=flow["verification_uri"],
+#         user_code=flow["user_code"],
+#         message=flow["message"],
+#         expires_in=int(
+#             flow.get(
+#                 "expires_in",
+#                 900,
+#             )
+#         ),
+#     )
 
 @router.get(
     "/microsoft/device/{session_id}/status",

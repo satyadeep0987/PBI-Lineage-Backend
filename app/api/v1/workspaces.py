@@ -30,7 +30,6 @@ from app.services.workspace_service import (
     WorkspaceService,
 )
 
-
 router = APIRouter()
 
 

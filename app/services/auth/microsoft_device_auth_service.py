@@ -17,6 +17,7 @@ from app.services.auth.device_auth_store import (
     save_device_session,
 )
 
+
 class MicrosoftDeviceAuthService:
 
     async def _wait_for_authentication(
@@ -41,81 +42,70 @@ class MicrosoftDeviceAuthService:
             authority=authority,
         )
 
-        try:
-            result = await asyncio.to_thread(
-                app.acquire_token_by_device_flow,
-                session.flow,
-            )
+        result = await asyncio.to_thread(
+            app.acquire_token_by_device_flow,
+            session.flow,
+        )
 
-            access_token = result.get(
-                "access_token"
-            )
+        access_token = result.get(
+            "access_token"
+        )
 
-            if not access_token:
-                session.status = "failed"
-
-                session.error_message = (
-                    result.get(
-                        "error",
-                        "authentication_failed",
-                    )
-                )
-
-                return
-
-            expires_in = int(
-                result.get(
-                    "expires_in",
-                    3600,
-                )
-            )
-
-            powerbi_expires_at = (
-                time()
-                + max(
-                    expires_in - 60,
-                    60,
-                )
-            )
-
-            powerbi_client = PowerBIClient()
-
-            await powerbi_client.validate_connection(
-                access_token
-            )
-
-            session.powerbi_access_token = (
-                access_token
-            )
-
-            session.powerbi_token_expires_at = (
-                powerbi_expires_at
-            )
-
-            session.powerbi_connected = True
-
-            #
-            # Attempt Fabric authentication
-            # silently using MSAL's cached account.
-            #
-            await self._try_acquire_fabric_token(
-                app=app,
-                session=session,
-            )
-
-            session.status = "authenticated"
-
-            session.flow.clear()
-
-        except Exception:
+        if not access_token:
             session.status = "failed"
 
-            session.powerbi_access_token = None
-
             session.error_message = (
-                "Microsoft authentication "
-                "or Power BI validation failed."
+                result.get(
+                    "error",
+                    "authentication_failed",
+                )
             )
+
+            return
+
+        expires_in = int(
+            result.get(
+                "expires_in",
+                3600,
+            )
+        )
+
+        powerbi_expires_at = (
+            time()
+            + max(
+                expires_in - 60,
+                60,
+            )
+        )
+
+        powerbi_client = PowerBIClient()
+
+        await powerbi_client.validate_connection(
+            access_token
+        )
+
+        session.powerbi_access_token = (
+            access_token
+        )
+
+        session.powerbi_token_expires_at = (
+            powerbi_expires_at
+        )
+
+        session.powerbi_connected = True
+
+        #
+        # Attempt Fabric authentication
+        # silently using MSAL's cached account.
+        #
+        await self._try_acquire_fabric_token(
+            app=app,
+            session=session,
+        )
+
+        session.status = "authenticated"
+
+        session.flow.clear()
 
     async def _wait_for_fabric_authentication(
         self,
@@ -139,69 +129,62 @@ class MicrosoftDeviceAuthService:
             authority=authority,
         )
 
-        try:
-            result = await asyncio.to_thread(
-                app.acquire_token_by_device_flow,
-                session.fabric_flow,
-            )
+        
+        result = await asyncio.to_thread(
+            app.acquire_token_by_device_flow,
+            session.fabric_flow,
+        )
 
-            access_token = result.get(
-                "access_token"
-            )
+        access_token = result.get(
+            "access_token"
+        )
 
-            if not access_token:
-                session.fabric_connected = False
-
-                session.fabric_error_code = (
-                    result.get(
-                        "error",
-                        "fabric_authentication_failed",
-                    )
-                )
-
-                return
-
-            expires_in = int(
-                result.get(
-                    "expires_in",
-                    3600,
-                )
-            )
-
-            expires_at = (
-                time()
-                + max(
-                    expires_in - 60,
-                    60,
-                )
-            )
-
-            fabric_client = FabricClient()
-
-            await fabric_client.validate_connection(
-                access_token
-            )
-
-            session.fabric_access_token = (
-                access_token
-            )
-
-            session.fabric_token_expires_at = (
-                expires_at
-            )
-
-            session.fabric_connected = True
-            session.fabric_error_code = None
-
-            session.fabric_flow.clear()
-
-        except Exception:
-            session.fabric_access_token = None
+        if not access_token:
             session.fabric_connected = False
 
             session.fabric_error_code = (
-                "fabric_authentication_failed"
+                result.get(
+                    "error",
+                    "fabric_authentication_failed",
+                )
             )
+
+            return
+
+        expires_in = int(
+            result.get(
+                "expires_in",
+                3600,
+            )
+        )
+
+        expires_at = (
+            time()
+            + max(
+                expires_in - 60,
+                60,
+            )
+        )
+
+        fabric_client = FabricClient()
+
+        await fabric_client.validate_connection(
+            access_token
+        )
+
+        session.fabric_access_token = (
+            access_token
+        )
+
+        session.fabric_token_expires_at = (
+            expires_at
+        )
+
+        session.fabric_connected = True
+        session.fabric_error_code = None
+
+        session.fabric_flow.clear()
+
 
     async def _try_acquire_fabric_token(
         self,
@@ -221,76 +204,68 @@ class MicrosoftDeviceAuthService:
 
         account = accounts[0]
 
-        try:
-            result = await asyncio.to_thread(
-                app.acquire_token_silent_with_error,
-                FABRIC_SCOPES,
-                account=account,
+        result = await asyncio.to_thread(
+            app.acquire_token_silent_with_error,
+            FABRIC_SCOPES,
+            account=account,
+        )
+
+        if not result:
+            session.fabric_connected = False
+            session.fabric_error_code = (
+                "interaction_required"
             )
 
-            if not result:
-                session.fabric_connected = False
-                session.fabric_error_code = (
-                    "interaction_required"
-                )
+            return
 
-                return
+        access_token = result.get(
+            "access_token"
+        )
 
-            access_token = result.get(
-                "access_token"
-            )
-
-            if not access_token:
-                session.fabric_connected = False
-
-                session.fabric_error_code = (
-                    result.get(
-                        "error",
-                        "interaction_required",
-                    )
-                )
-
-                return
-
-            expires_in = int(
-                result.get(
-                    "expires_in",
-                    3600,
-                )
-            )
-
-            expires_at = (
-                time()
-                + max(
-                    expires_in - 60,
-                    60,
-                )
-            )
-
-            fabric_client = FabricClient()
-
-            await fabric_client.validate_connection(
-                access_token
-            )
-
-            session.fabric_access_token = (
-                access_token
-            )
-
-            session.fabric_token_expires_at = (
-                expires_at
-            )
-
-            session.fabric_connected = True
-            session.fabric_error_code = None
-
-        except Exception:
-            session.fabric_access_token = None
+        if not access_token:
             session.fabric_connected = False
 
             session.fabric_error_code = (
-                "fabric_validation_failed"
+                result.get(
+                    "error",
+                    "interaction_required",
+                )
             )
+
+            return
+
+        expires_in = int(
+            result.get(
+                "expires_in",
+                3600,
+            )
+        )
+
+        expires_at = (
+            time()
+            + max(
+                expires_in - 60,
+                60,
+            )
+        )
+
+        fabric_client = FabricClient()
+
+        await fabric_client.validate_connection(
+            access_token
+        )
+
+        session.fabric_access_token = (
+            access_token
+        )
+
+        session.fabric_token_expires_at = (
+            expires_at
+        )
+
+        session.fabric_connected = True
+        session.fabric_error_code = None
+
 
     async def start(
         self,

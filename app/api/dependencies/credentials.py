@@ -1,30 +1,27 @@
 from typing import Annotated
 
-from fastapi import Depends, Cookie
-
+from fastapi import Cookie, Depends
 from fastapi.security import (
     HTTPAuthorizationCredentials,
     HTTPBearer,
 )
 
+from app.core.auth_session import (
+    AUTH_SESSION_COOKIE,
+)
 from app.core.exceptions import (
+    AuthenticationSessionExpiredError,
+    AuthenticationSessionRequiredError,
+    InvalidAccessTokenError,
     InvalidAuthenticationSchemeError,
     MissingAuthenticationCredentialsError,
     ProviderAuthenticationRequiredError,
-    AuthenticationSessionRequiredError,
-    AuthenticationSessionExpiredError,
-    InvalidAccessTokenError
-)
-
-from app.core.auth_session import (
-    AUTH_SESSION_COOKIE,
 )
 from app.services.auth.device_auth_store import (
     get_device_session,
     get_fabric_token,
     get_powerbi_token,
 )
-
 
 bearer_scheme = HTTPBearer(
     auto_error=False,

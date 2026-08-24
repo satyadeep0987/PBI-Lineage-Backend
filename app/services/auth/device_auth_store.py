@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from time import time
 from typing import Any
 
-
 SESSION_MAX_AGE_SECONDS = 45 * 60
 
 

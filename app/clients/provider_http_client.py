@@ -5,11 +5,11 @@ import httpx
 from app.core.exceptions import (
     InsufficientPermissionsError,
     InvalidAccessTokenError,
+    ProviderResourceNotFoundError,
     UpstreamRateLimitError,
     UpstreamRequestError,
     UpstreamTimeoutError,
     UpstreamUnavailableError,
-    ProviderResourceNotFoundError
 )
 
 DEFAULT_TIMEOUT_SECONDS = 30.0
