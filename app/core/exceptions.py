@@ -141,3 +141,65 @@ class InvalidAuthenticationSchemeError(
                 status.HTTP_401_UNAUTHORIZED
             ),
         )
+
+class UpstreamInvalidResponseError(AppException):
+    def __init__(self, provider: str) -> None:
+        super().__init__(
+            code="UPSTREAM_INVALID_RESPONSE",
+            message=(
+                f"{_provider_label(provider)} returned "
+                "an invalid response."
+            ),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            provider=provider,
+        )
+
+class ProviderAuthenticationRequiredError(
+    AppException
+):
+    def __init__(
+        self,
+        provider: str,
+    ) -> None:
+        super().__init__(
+            code="AUTH_PROVIDER_REQUIRED",
+            message=(
+                f"{_provider_label(provider)} "
+                "authentication is required."
+            ),
+            status_code=(
+                status.HTTP_401_UNAUTHORIZED
+            ),
+            provider=provider,
+        )
+
+class AuthenticationSessionRequiredError(
+    AppException
+):
+    def __init__(self) -> None:
+        super().__init__(
+            code="AUTH_SESSION_REQUIRED",
+            message=(
+                "A valid authentication "
+                "session is required."
+            ),
+            status_code=(
+                status.HTTP_401_UNAUTHORIZED
+            ),
+        )
+
+
+class AuthenticationSessionExpiredError(
+    AppException
+):
+    def __init__(self) -> None:
+        super().__init__(
+            code="AUTH_SESSION_EXPIRED",
+            message=(
+                "The authentication "
+                "session has expired."
+            ),
+            status_code=(
+                status.HTTP_401_UNAUTHORIZED
+            ),
+        )

@@ -1,6 +1,7 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Cookie
+
 from fastapi.security import (
     HTTPAuthorizationCredentials,
     HTTPBearer,
@@ -9,7 +10,21 @@ from fastapi.security import (
 from app.core.exceptions import (
     InvalidAuthenticationSchemeError,
     MissingAuthenticationCredentialsError,
+    ProviderAuthenticationRequiredError,
+    AuthenticationSessionRequiredError,
+    AuthenticationSessionExpiredError,
+    InvalidAccessTokenError
 )
+
+from app.core.auth_session import (
+    AUTH_SESSION_COOKIE,
+)
+from app.services.auth.device_auth_store import (
+    get_device_session,
+    get_fabric_token,
+    get_powerbi_token,
+)
+
 
 bearer_scheme = HTTPBearer(
     auto_error=False,
@@ -33,3 +48,71 @@ async def get_bearer_token(
         )
 
     return credentials.credentials
+
+
+async def get_powerbi_access_token(
+    session_id: str | None = Cookie(
+        default=None,
+        alias=AUTH_SESSION_COOKIE,
+    ),
+) -> str:
+    if not session_id:
+        raise (
+            MissingAuthenticationCredentialsError()
+        )
+
+    session = get_device_session(
+        session_id
+    )
+
+    if session is None:
+        raise (
+            MissingAuthenticationCredentialsError()
+        )
+
+    if session.status == "pending":
+        raise (
+            MissingAuthenticationCredentialsError()
+        )
+
+    token = get_powerbi_token(
+        session_id
+    )
+
+    if token is None:
+        raise InvalidAccessTokenError(
+            "powerbi"
+        )
+
+    return token
+
+async def get_fabric_access_token(
+    session_id: str | None = Cookie(
+        default=None,
+        alias=AUTH_SESSION_COOKIE,
+    ),
+) -> str:
+    if not session_id:
+        raise (
+            AuthenticationSessionRequiredError()
+        )
+
+    session = get_device_session(
+        session_id
+    )
+
+    if session is None:
+        raise (
+            AuthenticationSessionExpiredError()
+        )
+
+    token = get_fabric_token(
+        session_id
+    )
+
+    if token is None:
+        raise ProviderAuthenticationRequiredError(
+            provider="fabric"
+        )
+
+    return token
