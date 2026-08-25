@@ -2,7 +2,6 @@ MICROSOFT_LOGIN_BASE_URL = (
     "https://login.microsoftonline.com"
 )
 
-
 POWERBI_RESOURCE = (
     "https://analysis.windows.net/powerbi/api"
 )
@@ -21,6 +20,7 @@ POWERBI_SCOPES = [
 FABRIC_SCOPES = [
     f"{FABRIC_RESOURCE}/Workspace.Read.All",
     f"{FABRIC_RESOURCE}/Item.Read.All",
+    f"{FABRIC_RESOURCE}/Report.ReadWrite.All",
 ]
 
 

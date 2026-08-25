@@ -144,3 +144,69 @@ class PowerBIClient:
         return self._parse_list_response(
             response
         )
+
+    async def get_report(
+        self,
+        *,
+        workspace_id: str,
+        report_id: str,
+        access_token: str,
+    ) -> dict[str, Any]:
+        response = await provider_get(
+            provider="powerbi",
+            url=(
+                f"{self.BASE_URL}/groups/"
+                f"{workspace_id}/reports/{report_id}"
+            ),
+            access_token=access_token,
+        )
+
+        return self._parse_object_response(
+            response
+        )
+
+
+    async def get_report_pages(
+        self,
+        *,
+        workspace_id: str,
+        report_id: str,
+        access_token: str,
+    ) -> list[dict[str, Any]]:
+        response = await provider_get(
+            provider="powerbi",
+            url=(
+                f"{self.BASE_URL}/groups/"
+                f"{workspace_id}/reports/"
+                f"{report_id}/pages"
+            ),
+            access_token=access_token,
+        )
+
+        return self._parse_list_response(
+            response
+        )
+
+
+    async def get_report_page(
+        self,
+        *,
+        workspace_id: str,
+        report_id: str,
+        page_name: str,
+        access_token: str,
+    ) -> dict[str, Any]:
+        response = await provider_get(
+            provider="powerbi",
+            url=(
+                f"{self.BASE_URL}/groups/"
+                f"{workspace_id}/reports/"
+                f"{report_id}/pages/"
+                f"{page_name}"
+            ),
+            access_token=access_token,
+        )
+
+        return self._parse_object_response(
+            response
+        )
