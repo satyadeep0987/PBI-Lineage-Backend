@@ -12,6 +12,9 @@ from app.api.dependencies.credentials import (
     get_fabric_access_token,
     get_powerbi_access_token,
 )
+from app.schemas.normalized_report_definition import (
+    NormalizedReportDefinitionResponse,
+)
 from app.schemas.report import (
     Report,
     ReportListResponse,
@@ -261,4 +264,50 @@ async def get_workspace_report_definition(
         definition_format=(
             definition_format
         ),
+    )
+
+@router.post(
+    (
+        "/{workspace_id}/reports/"
+        "{report_id}/definition/normalized"
+    ),
+    response_model=(
+        NormalizedReportDefinitionResponse
+    ),
+)
+async def get_normalized_report_definition(
+    workspace_id: UUID,
+    report_id: UUID,
+    access_token: Annotated[
+        str,
+        Depends(
+            get_fabric_access_token
+        ),
+    ],
+    definition_format: Annotated[
+        str | None,
+        Query(
+            alias="format",
+            min_length=1,
+            max_length=64,
+        ),
+    ] = None,
+) -> NormalizedReportDefinitionResponse:
+    service = (
+        ReportDefinitionService()
+    )
+
+    return await (
+        service.get_normalized_definition(
+            workspace_id=str(
+                workspace_id
+            ),
+            report_id=str(
+                report_id
+            ),
+            access_token=access_token,
+            definition_format=(
+                definition_format
+            ),
+        )
     )

@@ -12,10 +12,16 @@ from app.core.exceptions import (
     UpstreamRequestError,
     UpstreamTimeoutError,
 )
+from app.schemas.normalized_report_definition import (
+    NormalizedReportDefinitionResponse,
+)
 from app.schemas.report_definition import (
     ReportDefinition,
     ReportDefinitionPart,
     ReportDefinitionResponse,
+)
+from app.services.report_definition_normalizer import (
+    ReportDefinitionNormalizer,
 )
 
 
@@ -364,6 +370,33 @@ class ReportDefinitionService:
 
         raise UpstreamInvalidResponseError(
             "fabric"
+        )
+
+    async def get_normalized_definition(
+        self,
+        *,
+        workspace_id: str,
+        report_id: str,
+        access_token: str,
+        definition_format: str | None = None,
+    ) -> NormalizedReportDefinitionResponse:
+        raw_definition = (
+            await self.get_definition(
+                workspace_id=workspace_id,
+                report_id=report_id,
+                access_token=access_token,
+                definition_format=(
+                    definition_format
+                ),
+            )
+        )
+
+        normalizer = (
+            ReportDefinitionNormalizer()
+        )
+
+        return normalizer.normalize(
+            raw_definition
         )
 
 
