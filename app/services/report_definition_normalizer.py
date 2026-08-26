@@ -17,6 +17,9 @@ from app.schemas.report_definition import (
 from app.services.report_definition_decoder import (
     ReportDefinitionDecoder,
 )
+from app.services.visual_field_reference_extractor import (
+    extract_visual_field_references,
+)
 
 PAGE_PATTERN = re.compile(
     r"^definition/pages/"
@@ -531,6 +534,11 @@ class ReportDefinitionNormalizer:
                     payload.get(
                         "position"
                     )
+                )
+            ),
+            field_references=(
+                extract_visual_field_references(
+                    payload
                 )
             ),
         )

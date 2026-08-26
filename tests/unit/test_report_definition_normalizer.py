@@ -262,7 +262,6 @@ def test_semantic_model_by_path():
         == "../Sales.SemanticModel"
     )
 
-
 def test_visual_without_title():
     normalizer = (
         ReportDefinitionNormalizer()
@@ -304,7 +303,6 @@ def test_visual_without_title():
         visual.title_is_dynamic
         is False
     )
-
 
 def test_visual_title_can_be_hidden():
     normalizer = (
@@ -412,3 +410,52 @@ def test_dynamic_visual_title():
         visual.title_is_dynamic
         is True
     )
+
+
+def test_normalized_visual_contains_field_references():
+    visual_definition = {
+        "name": "visual-123",
+        "visual": {
+            "visualType": "card",
+            "query": {
+                "queryState": {
+                    "Values": {
+                        "projections": [
+                            {
+                                "field": {
+                                    "Measure": {
+                                        "Expression": {
+                                            "SourceRef": {
+                                                "Entity": "Sales"
+                                            }
+                                        },
+                                        "Property": "Revenue",
+                                    }
+                                },
+                                "queryRef": "Sales.Revenue",
+                            }
+                        ]
+                    }
+                }
+            },
+        },
+    }
+
+    normalizer = ReportDefinitionNormalizer()
+
+    normalized = normalizer._normalize_visual(
+        visual_folder="visual-123",
+        payload=visual_definition,
+    )
+
+    assert normalized.has_query is True
+    assert len(normalized.field_references) == 1
+
+    field = normalized.field_references[0]
+
+    assert field.object_type == "measure"
+    assert field.table_name == "Sales"
+    assert field.object_name == "Revenue"
+    assert field.usage == "projection"
+    assert field.role == "Values"
+    assert field.query_ref == "Sales.Revenue"

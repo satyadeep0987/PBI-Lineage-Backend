@@ -1,6 +1,44 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class VisualFieldReference(BaseModel):
+    object_type: Literal[
+        "column",
+        "measure",
+        "hierarchy",
+        "hierarchy_level",
+    ]
+
+    table_name: str | None = None
+    object_name: str | None = None
+
+    # Where/how the field is used in the visual
+    usage: Literal[
+        "projection",
+        "sort",
+        "filter",
+    ]
+
+    # Power BI visual role, for example:
+    # Category, Series, Y, X, Values, Rows, Columns, Tooltips
+    role: str | None = None
+
+    # Diagnostic metadata only.
+    # Do NOT use this as authoritative table/field identity.
+    query_ref: str | None = None
+
+    active: bool | None = None
+
+    # Used for hierarchy references
+    hierarchy_name: str | None = None
+    level_name: str | None = None
+
+    # Preserve the PBIR aggregation function value.
+    # Don't translate the numeric value yet.
+    aggregation_function: int | str | None = None
+
 
 
 class SemanticModelReference(BaseModel):
@@ -42,6 +80,10 @@ class NormalizedReportVisual(BaseModel):
     position: (
         NormalizedVisualPosition | None
     ) = None
+
+    field_references: list[VisualFieldReference] = Field(
+        default_factory=list
+    )
 
 class NormalizedReportPage(BaseModel):
     name: str
@@ -91,3 +133,4 @@ class NormalizedReportDefinitionResponse(
     decoded_json_part_count: int
 
     warnings: list[str]
+
