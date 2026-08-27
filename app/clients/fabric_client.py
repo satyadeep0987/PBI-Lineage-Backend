@@ -81,6 +81,31 @@ class FabricClient:
             not_found_resource="report",
         )
 
+    async def start_semantic_model_definition(
+        self,
+        *,
+        workspace_id: str,
+        semantic_model_id: str,
+        access_token: str,
+        definition_format: str = "TMDL",
+    ) -> httpx.Response:
+        return await provider_post(
+            provider="fabric",
+            url=(
+                f"{self.BASE_URL}/workspaces/"
+                f"{workspace_id}/semanticModels/"
+                f"{semantic_model_id}/"
+                "getDefinition"
+            ),
+            access_token=access_token,
+            params={
+                "format": definition_format,
+            },
+            not_found_resource=(
+                "semantic_model"
+            ),
+        )
+
     async def get_operation_state(
         self,
         *,

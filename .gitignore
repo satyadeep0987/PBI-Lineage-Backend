@@ -48,3 +48,5 @@ temp/
 *.tmp
 
 /local_fastapi_auth_test/
+
+PROJECT_CONTEXT.md

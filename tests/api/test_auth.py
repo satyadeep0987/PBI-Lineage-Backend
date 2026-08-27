@@ -1,6 +1,11 @@
 from uuid import uuid4
 
 from app.core.auth_session import AUTH_SESSION_COOKIE
+from app.core.microsoft_auth import (
+    FABRIC_SCOPES,
+    POWERBI_SCOPES,
+    get_scope_permission,
+)
 from app.services.auth.device_auth_store import (
     DeviceAuthSession,
     delete_device_session,
@@ -11,12 +16,24 @@ from app.services.auth.microsoft_device_auth_service import (
 )
 
 
+def _scope_permissions(
+    scopes: list[str],
+) -> list[str]:
+    return [
+        get_scope_permission(scope)
+        for scope in scopes
+    ]
+
 def _create_session(
     *,
     status: str,
     powerbi_connected: bool | None = None,
     fabric_connected: bool | None = None,
     error_message: str | None = None,
+    powerbi_error_code: str | None = None,
+    fabric_error_code: str | None = None,
+    powerbi_granted_scopes: list[str] | None = None,
+    fabric_granted_scopes: list[str] | None = None,
 ) -> str:
     session_id = str(uuid4())
 
@@ -30,6 +47,14 @@ def _create_session(
     session.powerbi_connected = powerbi_connected
     session.fabric_connected = fabric_connected
     session.error_message = error_message
+    session.powerbi_error_code = powerbi_error_code
+    session.fabric_error_code = fabric_error_code
+    session.powerbi_granted_scopes = list(
+        powerbi_granted_scopes or []
+    )
+    session.fabric_granted_scopes = list(
+        fabric_granted_scopes or []
+    )
 
     save_device_session(
         session_id,
@@ -144,6 +169,12 @@ def test_device_status_authenticated(
         status="authenticated",
         powerbi_connected=True,
         fabric_connected=True,
+        powerbi_granted_scopes=(
+            _scope_permissions(POWERBI_SCOPES)
+        ),
+        fabric_granted_scopes=(
+            _scope_permissions(FABRIC_SCOPES)
+        ),
     )
 
     try:
@@ -174,10 +205,70 @@ def test_device_status_authenticated(
             is True
         )
 
+        assert (
+            payload["powerbi"]["requested_scopes"]
+            == POWERBI_SCOPES
+        )
+        assert (
+            payload["powerbi"]["missing_scopes"]
+            == []
+        )
+        assert (
+            payload["fabric"]["requested_scopes"]
+            == FABRIC_SCOPES
+        )
+        assert (
+            payload["fabric"]["missing_scopes"]
+            == []
+        )
+
     finally:
         delete_device_session(session_id)
         client.cookies.clear()
 
+def test_device_status_by_session_id_includes_scope_details(
+    client,
+):
+    session_id = _create_session(
+        status="authenticated",
+        powerbi_connected=True,
+        fabric_connected=False,
+        powerbi_granted_scopes=(
+            _scope_permissions(POWERBI_SCOPES)
+        ),
+        fabric_error_code="interaction_required",
+    )
+
+    try:
+        response = client.get(
+            
+                "/api/v1/auth/microsoft/device/"
+                f"{session_id}/status"
+            
+        )
+
+        assert response.status_code == 200
+
+        payload = response.json()
+
+        assert payload["status"] == "authenticated"
+        assert (
+            payload["powerbi"]["missing_scopes"]
+            == []
+        )
+        assert (
+            payload["fabric"]["connected"]
+            is False
+        )
+        assert (
+            payload["fabric"]["error_code"]
+            == "interaction_required"
+        )
+        assert payload["fabric"]["missing_scopes"]
+
+    finally:
+        delete_device_session(session_id)
+        client.cookies.clear()
 
 def test_device_status_powerbi_connected_fabric_not_connected(
     client,
@@ -186,6 +277,13 @@ def test_device_status_powerbi_connected_fabric_not_connected(
         status="authenticated",
         powerbi_connected=True,
         fabric_connected=False,
+        powerbi_granted_scopes=(
+            _scope_permissions(POWERBI_SCOPES)
+        ),
+        fabric_granted_scopes=[
+            "Workspace.Read.All"
+        ],
+        fabric_error_code="interaction_required",
     )
 
     try:
@@ -214,6 +312,20 @@ def test_device_status_powerbi_connected_fabric_not_connected(
         assert (
             payload["fabric"]["connected"]
             is False
+        )
+
+        assert (
+            payload["fabric"]["error_code"]
+            == "interaction_required"
+        )
+        assert (
+            payload["fabric"]["granted_scopes"]
+            == ["Workspace.Read.All"]
+        )
+        assert (
+            "https://api.fabric.microsoft.com/"
+            "Item.ReadWrite.All"
+            in payload["fabric"]["missing_scopes"]
         )
 
     finally:

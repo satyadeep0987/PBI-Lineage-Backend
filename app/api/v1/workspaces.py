@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import (
@@ -29,6 +29,9 @@ from app.schemas.report_page import (
 from app.schemas.semantic_model import (
     SemanticModelListResponse,
 )
+from app.schemas.semantic_model_definition import (
+    SemanticModelDefinitionResponse,
+)
 from app.schemas.workspace import (
     Workspace,
     WorkspaceListResponse,
@@ -38,6 +41,9 @@ from app.services.report_definition_service import (
 )
 from app.services.report_service import (
     ReportService,
+)
+from app.services.semantic_model_definition_service import (
+    SemanticModelDefinitionService,
 )
 from app.services.semantic_model_service import (
     SemanticModelService,
@@ -247,7 +253,7 @@ async def get_workspace_report_definition(
             min_length=1,
             max_length=64,
         ),
-    ] = None,
+    ] = "TMDL",
 ) -> ReportDefinitionResponse:
     service = (
         ReportDefinitionService()
@@ -291,7 +297,7 @@ async def get_normalized_report_definition(
             min_length=1,
             max_length=64,
         ),
-    ] = None,
+    ] = "TMDL",
 ) -> NormalizedReportDefinitionResponse:
     service = (
         ReportDefinitionService()
@@ -310,4 +316,50 @@ async def get_normalized_report_definition(
                 definition_format
             ),
         )
+    )
+
+
+@router.post(
+    (
+        "/{workspace_id}/semantic-models/"
+        "{semantic_model_id}/definition"
+    ),
+    response_model=(
+        SemanticModelDefinitionResponse
+    ),
+)
+async def get_workspace_semantic_model_definition(
+    workspace_id: UUID,
+    semantic_model_id: UUID,
+    access_token: Annotated[
+        str,
+        Depends(
+            get_fabric_access_token
+        ),
+    ],
+    definition_format: Annotated[
+        Literal[
+            "TMDL",
+            "TMSL",
+        ],
+        Query(
+            alias="format",
+        ),
+    ] = "TMDL",
+) -> SemanticModelDefinitionResponse:
+    service = (
+        SemanticModelDefinitionService()
+    )
+
+    return await service.get_definition(
+        workspace_id=str(
+            workspace_id
+        ),
+        semantic_model_id=str(
+            semantic_model_id
+        ),
+        access_token=access_token,
+        definition_format=(
+            definition_format
+        ),
     )

@@ -76,10 +76,33 @@ class MicrosoftDeviceAuthStartResponse(BaseModel):
     expires_in: int
 
 
+class ProviderScopeAccess(BaseModel):
+    scope: str
+    permission: str
+    granted: bool
+
+
 class ProviderTestResult(BaseModel):
     connected: bool
     message: str
 
+    error_code: str | None = None
+
+    requested_scopes: list[str] = Field(
+        default_factory=list
+    )
+
+    granted_scopes: list[str] = Field(
+        default_factory=list
+    )
+
+    missing_scopes: list[str] = Field(
+        default_factory=list
+    )
+
+    scope_access: list[ProviderScopeAccess] = Field(
+        default_factory=list
+    )
 
 class MicrosoftDeviceAuthStatusResponse(BaseModel):
     status: Literal[

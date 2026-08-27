@@ -36,6 +36,10 @@ class DeviceAuthSession:
     fabric_error_code: str | None = None
     error_message: str | None = None
 
+    powerbi_granted_scopes: list[str] = field(default_factory=list)
+    fabric_granted_scopes: list[str] = field(default_factory=list)
+    powerbi_error_code: str | None = None
+
 
 _device_sessions: dict[
     str,
@@ -98,6 +102,8 @@ def get_powerbi_token(
     ):
         session.powerbi_access_token = None
         session.powerbi_connected = False
+        session.powerbi_granted_scopes.clear()
+        session.powerbi_error_code = "token_expired"
 
         return None
 
@@ -129,6 +135,8 @@ def get_fabric_token(
     ):
         session.fabric_access_token = None
         session.fabric_connected = False
+        session.fabric_granted_scopes.clear()
+        session.fabric_error_code = "token_expired"
 
         return None
 
@@ -140,7 +148,7 @@ def delete_device_session(
 ) -> None:
     session = _device_sessions.pop(
         session_id,
-        None,
+        None
     )
 
     if session is None:
@@ -148,6 +156,12 @@ def delete_device_session(
 
     session.powerbi_access_token = None
     session.fabric_access_token = None
+
+    session.powerbi_granted_scopes.clear()
+    session.fabric_granted_scopes.clear()
+
+    session.powerbi_error_code = None
+    session.fabric_error_code = None
 
     session.flow.clear()
     session.fabric_flow.clear()
