@@ -42,6 +42,9 @@ from app.schemas.workspace import (
     Workspace,
     WorkspaceListResponse,
 )
+from app.schemas.xmla_metadata import (
+    XmlaSemanticModelMetadataResponse,
+)
 from app.services.report_definition_service import (
     ReportDefinitionService,
 )
@@ -59,6 +62,9 @@ from app.services.semantic_model_service import (
 )
 from app.services.workspace_service import (
     WorkspaceService,
+)
+from app.services.xmla_metadata_service import (
+    XmlaMetadataService,
 )
 
 router = APIRouter()
@@ -406,6 +412,50 @@ async def get_workspace_parsed_semantic_model_definition(
         semantic_model_id=str(semantic_model_id),
         access_token=access_token,
         definition_format=definition_format,
+    )
+
+
+@router.get(
+    (
+        "/{workspace_id}/semantic-models/"
+        "{semantic_model_id}/xmla/metadata"
+    ),
+    response_model=XmlaSemanticModelMetadataResponse,
+)
+async def get_workspace_semantic_model_xmla_metadata(
+    workspace_id: UUID,
+    semantic_model_id: UUID,
+    access_token: Annotated[
+        str,
+        Depends(
+            get_powerbi_access_token
+        ),
+    ],
+    workspace_name: Annotated[
+        str | None,
+        Query(
+            alias="workspaceName",
+            min_length=1,
+            max_length=256,
+        ),
+    ] = None,
+    database_name: Annotated[
+        str | None,
+        Query(
+            alias="databaseName",
+            min_length=1,
+            max_length=256,
+        ),
+    ] = None,
+) -> XmlaSemanticModelMetadataResponse:
+    service = XmlaMetadataService()
+
+    return await service.get_metadata(
+        workspace_id=str(workspace_id),
+        semantic_model_id=str(semantic_model_id),
+        access_token=access_token,
+        workspace_name=workspace_name,
+        database_name=database_name,
     )
 
 

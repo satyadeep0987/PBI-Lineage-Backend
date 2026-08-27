@@ -5,6 +5,7 @@ def _provider_label(provider: str) -> str:
     labels = {
         "powerbi": "Power BI",
         "fabric": "Fabric",
+        "xmla": "XMLA",
         "snowflake": "Snowflake",
     }
 
@@ -110,6 +111,29 @@ class UpstreamRequestError(AppException):
             status_code=status.HTTP_502_BAD_GATEWAY,
             provider=provider,
         )
+
+
+class ProviderIntegrationNotConfiguredError(
+    AppException
+):
+    def __init__(
+        self,
+        provider: str,
+    ) -> None:
+        super().__init__(
+            code=(
+                "PROVIDER_INTEGRATION_NOT_CONFIGURED"
+            ),
+            message=(
+                f"{_provider_label(provider)} "
+                "integration is not configured."
+            ),
+            status_code=(
+                status.HTTP_501_NOT_IMPLEMENTED
+            ),
+            provider=provider,
+        )
+
 
 class MissingAuthenticationCredentialsError(
     AppException

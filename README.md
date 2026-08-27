@@ -33,12 +33,13 @@ Current capabilities:
 - Carries semantic model source-path evidence into lineage matches.
 - Adds lineage diagnostics with match confidence, candidate suggestions, and
   summary counts by status and object type.
+- Defines XMLA semantic model metadata contracts and a service/client boundary.
 - Exposes provider authentication/scope diagnostics.
 
 Future capabilities:
 
 - Improve semantic model parser coverage for more TMDL shapes.
-- Add XMLA metadata extraction.
+- Implement the XMLA transport adapter for live metadata extraction.
 - Add Snowflake lineage.
 - Add impact analysis APIs.
 - Add production-grade auth/session storage.
@@ -169,6 +170,21 @@ The semantic-lineage endpoint returns visual field matches, source-path
 evidence, match confidence, candidate suggestions for unmatched fields, and a
 diagnostics summary.
 
+### XMLA Metadata
+
+```text
+GET /api/v1/workspaces/{workspace_id}/semantic-models/{semantic_model_id}/xmla/metadata
+```
+
+Optional query parameters:
+
+- `workspaceName`
+- `databaseName`
+
+This endpoint defines the XMLA metadata response contract and service/client
+boundary. The live XMLA transport adapter is still pending, so the default
+client returns a configured integration error until the adapter is implemented.
+
 ## Folder Structure
 
 ```text
@@ -211,15 +227,16 @@ FastAPI routing layer.
   - In-progress scope diagnostics for Power BI and Fabric status.
 - `app/api/v1/workspaces.py`
   - Workspace, report, page, semantic model, report definition, normalized
-    report definition, and semantic model definition endpoints.
+    report definition, semantic model definition, semantic lineage, and XMLA
+    metadata endpoints.
 - `app/api/dependencies/credentials.py`
   - FastAPI dependencies for extracting Power BI and Fabric access tokens from
     the auth session cookie.
 
 ### `app/clients`
 
-Provider HTTP clients. These files should know provider URL details but should
-not contain business normalization logic.
+Provider clients. These files should know provider URL/protocol details but
+should not contain business normalization logic.
 
 - `provider_http_client.py`
   - Shared HTTP behavior and provider error mapping.
@@ -229,6 +246,8 @@ not contain business normalization logic.
   - Microsoft Fabric API client.
   - Handles report and semantic model definition endpoints and long-running
     operation result APIs.
+- `xmla_client.py`
+  - XMLA endpoint convention and future adapter boundary.
 - `snowflake_client.py`
   - Placeholder for future Snowflake integration.
 
@@ -282,6 +301,9 @@ Pydantic API contracts.
 - `report_semantic_lineage.py`
   - API shape for report visual field to semantic model object lineage,
     diagnostics, match confidence, and candidate suggestions.
+- `xmla_metadata.py`
+  - API shape for XMLA semantic model metadata, including tables, columns,
+    measures, partitions, hierarchies, relationships, counts, and warnings.
 - `auth.py`
   - Microsoft auth requests, device flow responses, provider connection status,
     and scope diagnostics.
@@ -311,6 +333,8 @@ Business logic layer. Routes call services; services call clients.
 - `report_semantic_lineage_service.py`
   - Matches normalized report visual field references to parsed semantic model
     objects and produces diagnostics.
+- `xmla_metadata_service.py`
+  - Maps XMLA adapter output into the XMLA metadata response contract.
 - `report_definition_decoder.py`
   - Decodes structural JSON definition parts from base64 payloads.
 - `report_definition_normalizer.py`
@@ -358,6 +382,10 @@ Automated tests.
   - Parsed TMDL semantic model behavior.
 - `tests/unit/test_report_semantic_lineage_service.py`
   - Report visual field to semantic model object matching and diagnostics.
+- `tests/unit/test_xmla_client.py`
+  - XMLA endpoint convention and pending-adapter boundary.
+- `tests/unit/test_xmla_metadata_service.py`
+  - XMLA metadata contract mapping and validation.
 - `tests/unit/test_report_definition_decoder.py`
   - Base64/JSON definition decoding.
 - `tests/unit/test_report_definition_normalizer.py`
@@ -392,28 +420,28 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.9 | Completed locally | Added report visual field to semantic model object matching. |
 | Aug 28, 2026 | Phase 3.10 | Completed locally | Improved TMDL parser fidelity and source-path evidence. |
 | Aug 28, 2026 | Phase 3.11 | Completed locally | Added lineage diagnostics, candidate suggestions, and summary counts. |
+| Aug 28, 2026 | Phase 3.12 | Completed locally | Added XMLA metadata contracts and service/client boundary. |
 
 ### Latest Completed Phase
 
-Phase 3.11 is the latest completed local phase. It adds per-field
-`match_confidence`, candidate suggestions for unmatched visual fields, clearer
-hierarchy-level unmatched reasons, and `diagnostics_summary` counts by status,
-object type, and reason.
+Phase 3.12 is the latest completed local phase. It adds XMLA semantic model
+metadata response contracts, a Power BI-authenticated XMLA metadata route, an
+XMLA client boundary, and service-level mapping/validation.
 
 ### Next Phase
 
-Phase 3.12 - Prepare XMLA Metadata Extraction is the next phase.
+Phase 3.13 - Implement XMLA Transport Adapter is the next phase.
 
-Recommended Phase 3.12 work:
+Recommended Phase 3.13 work:
 
-- Define XMLA metadata response schemas.
-- Add a provider boundary for XMLA connection/configuration.
-- Keep XMLA semantic metadata separate from Fabric definition parsing until the
-  merge contract is explicit.
+- Choose and wire the XMLA transport dependency.
+- Implement live metadata extraction through the `XmlaClient` boundary.
+- Keep extracted XMLA metadata separate from Fabric TMDL parsing until the merge
+  contract is explicit.
 
 ## Current Review Notes
 
-Phase 3.6 through Phase 3.11 are locally verified with Ruff and pytest. The
+Phase 3.6 through Phase 3.12 are locally verified with Ruff and pytest. The
 only current test-suite warning is a third-party FastAPI/TestClient warning
 about Starlette's `httpx` integration.
 

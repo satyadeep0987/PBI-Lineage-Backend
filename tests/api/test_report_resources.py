@@ -19,6 +19,10 @@ from app.schemas.semantic_model_definition import (
     SemanticModelDefinitionPart,
     SemanticModelDefinitionResponse,
 )
+from app.schemas.xmla_metadata import (
+    XmlaSemanticModelMetadataResponse,
+    XmlaSemanticModelTable,
+)
 from app.services.report_semantic_lineage_service import (
     ReportSemanticLineageService,
 )
@@ -27,6 +31,9 @@ from app.services.report_service import (
 )
 from app.services.semantic_model_definition_service import (
     SemanticModelDefinitionService,
+)
+from app.services.xmla_metadata_service import (
+    XmlaMetadataService,
 )
 
 WORKSPACE_ID = (
@@ -312,6 +319,83 @@ def test_semantic_model_definition_rejects_invalid_format(
     )
 
     assert response.status_code == 422
+
+
+def test_get_semantic_model_xmla_metadata(
+    client,
+    monkeypatch,
+):
+    async def fake_get_metadata(
+        self,
+        *,
+        workspace_id: str,
+        semantic_model_id: str,
+        access_token: str,
+        workspace_name: str | None,
+        database_name: str | None,
+    ) -> XmlaSemanticModelMetadataResponse:
+        assert workspace_id == WORKSPACE_ID
+        assert semantic_model_id == SEMANTIC_MODEL_ID
+        assert access_token == "fake-test-token"
+        assert workspace_name == "Sales Workspace"
+        assert database_name == "Sales Model"
+
+        return XmlaSemanticModelMetadataResponse(
+            workspace_id=workspace_id,
+            semantic_model_id=semantic_model_id,
+            xmla_endpoint=(
+                "powerbi://api.powerbi.com/v1.0/"
+                "myorg/Sales Workspace"
+            ),
+            database_name=database_name,
+            table_count=1,
+            column_count=0,
+            measure_count=0,
+            relationship_count=0,
+            hierarchy_count=0,
+            partition_count=0,
+            tables=[
+                XmlaSemanticModelTable(
+                    name="Sales"
+                )
+            ],
+        )
+
+    monkeypatch.setattr(
+        XmlaMetadataService,
+        "get_metadata",
+        fake_get_metadata,
+    )
+
+    response = client.get(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        "semantic-models/"
+        f"{SEMANTIC_MODEL_ID}/xmla/metadata"
+        "?workspaceName=Sales%20Workspace"
+        "&databaseName=Sales%20Model"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["workspace_id"] == WORKSPACE_ID
+    assert (
+        payload["semantic_model_id"]
+        == SEMANTIC_MODEL_ID
+    )
+    assert payload["source"] == "xmla"
+    assert (
+        payload["xmla_endpoint"]
+        == "powerbi://api.powerbi.com/v1.0/"
+        "myorg/Sales Workspace"
+    )
+    assert payload["database_name"] == "Sales Model"
+    assert payload["table_count"] == 1
+    assert (
+        payload["tables"][0]["name"]
+        == "Sales"
+    )
 
 
 def test_get_report_semantic_lineage(
