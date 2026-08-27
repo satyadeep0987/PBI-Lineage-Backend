@@ -12,6 +12,10 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    xmla_tenant_name: str = "myorg"
+    xmla_adomd_dll_path: str | None = None
+    xmla_access_token_minutes: int = 55
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

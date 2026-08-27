@@ -31,9 +31,10 @@ Current capabilities:
 - Parses TMDL semantic model definitions into tables, columns, measures,
   relationships, and hierarchies.
 - Carries semantic model source-path evidence into lineage matches.
+- Extracts XMLA semantic model metadata through an ADOMD adapter when the host
+  has the Analysis Services client libraries configured.
 - Adds lineage diagnostics with match confidence, candidate suggestions, and
   summary counts by status and object type.
-- Defines XMLA semantic model metadata contracts and a service/client boundary.
 - Exposes provider authentication/scope diagnostics.
 - Validates Fabric report definition formats separately from semantic model
   definition formats.
@@ -42,7 +43,7 @@ Current capabilities:
 Future capabilities:
 
 - Improve semantic model parser coverage for more TMDL shapes.
-- Implement the XMLA transport adapter for live metadata extraction.
+- Validate XMLA extraction against live Power BI/Fabric capacities.
 - Add Snowflake lineage.
 - Add impact analysis APIs.
 - Add production-grade auth/session storage.
@@ -114,7 +115,15 @@ APP_VERSION=0.1.0
 ENVIRONMENT=development
 API_V1_PREFIX=/api/v1
 LOG_LEVEL=INFO
+XMLA_TENANT_NAME=myorg
+XMLA_ADOMD_DLL_PATH=
+XMLA_ACCESS_TOKEN_MINUTES=55
 ```
+
+XMLA live extraction requires `pythonnet` plus the Microsoft Analysis Services
+ADOMD client library on the host. If the ADOMD assembly is not discoverable,
+set `XMLA_ADOMD_DLL_PATH` to the installed
+`Microsoft.AnalysisServices.AdomdClient.dll` path.
 
 ## API Overview
 
@@ -201,10 +210,14 @@ Optional query parameters:
 - `workspaceName`
 - `databaseName`
 
-This endpoint defines the XMLA metadata response contract and service/client
-boundary. The live XMLA transport adapter is still pending, so the default
-client returns `PROVIDER_INTEGRATION_NOT_CONFIGURED` with a transport-adapter
-configuration message until the adapter is implemented.
+This endpoint uses the Power BI token dependency and the XMLA ADOMD adapter to
+query `$SYSTEM.TMSCHEMA_*` rowsets for tables, columns, measures, partitions,
+hierarchies, levels, and relationships. Workspace names are URI encoded in the
+`powerbi://api.powerbi.com/v1.0/{tenant}/{workspace}` endpoint.
+
+If `pythonnet` or the Microsoft Analysis Services ADOMD assembly is not
+available on the host, the client returns `PROVIDER_INTEGRATION_NOT_CONFIGURED`
+with a setup message.
 
 ## Folder Structure
 
@@ -271,9 +284,12 @@ should not contain business normalization logic.
   - Uses `PBIR` by default for report definitions and `TMDL` by default for
     semantic model definitions.
 - `xmla_client.py`
-  - XMLA endpoint convention and future adapter boundary.
-  - Raises a configured integration error until a live XMLA transport adapter is
-    wired.
+  - XMLA endpoint and connection-string construction.
+  - ADOMD connection wrapper using the ADOMD `AccessToken` property.
+  - TMSCHEMA rowset queries and raw metadata mapping for tables, columns,
+    measures, partitions, hierarchies, levels, and relationships.
+  - Raises a configured integration error when `pythonnet` or the ADOMD client
+    assembly is unavailable.
 - `snowflake_client.py`
   - Placeholder for future Snowflake integration.
 
@@ -283,6 +299,7 @@ Cross-cutting application infrastructure.
 
 - `config.py`
   - Environment-backed settings.
+  - Includes XMLA tenant, ADOMD DLL path, and access-token expiry settings.
 - `auth_session.py`
   - Auth cookie name and max-age constants.
 - `microsoft_auth.py`
@@ -364,7 +381,8 @@ Business logic layer. Routes call services; services call clients.
   - Matches normalized report visual field references to parsed semantic model
     objects and produces diagnostics.
 - `xmla_metadata_service.py`
-  - Maps XMLA adapter output into the XMLA metadata response contract.
+  - Maps XMLA adapter output into the XMLA metadata response contract and
+    validates adapter payload shape.
 - `report_definition_decoder.py`
   - Decodes structural JSON definition parts from base64 payloads.
 - `report_definition_normalizer.py`
@@ -415,7 +433,8 @@ Automated tests.
 - `tests/unit/test_report_semantic_lineage_service.py`
   - Report visual field to semantic model object matching and diagnostics.
 - `tests/unit/test_xmla_client.py`
-  - XMLA endpoint convention and pending-adapter boundary.
+  - XMLA endpoint encoding, connection-string construction, ADOMD rowset
+    mapping, adapter setup failures, and access-token redaction.
 - `tests/unit/test_xmla_metadata_service.py`
   - XMLA metadata contract mapping and validation.
 - `tests/unit/test_report_definition_decoder.py`
@@ -455,29 +474,33 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.12 | Completed locally | Added XMLA metadata contracts and service/client boundary. |
 | Aug 28, 2026 | Phase 3.12.1 | Completed locally | Corrected Fabric report definition formats to default to PBIR and reject semantic-model-only formats. |
 | Aug 28, 2026 | Phase 3.12.2 | Completed locally | Added upstream provider diagnostic detail for Fabric request and operation failures. |
+| Aug 28, 2026 | Phase 3.13 | Completed locally | Implemented the XMLA ADOMD adapter path and TMSCHEMA metadata extraction mapping. |
 
 ### Latest Completed Phase
 
-Phase 3.12.2 is the latest completed local phase. It stabilizes the Phase 3.12
-contracts by separating report and semantic model definition formats, defaulting
-report definitions to `PBIR`, rejecting invalid lineage format combinations at
-the route layer, and preserving Fabric provider details when requests or
-long-running operations fail.
+Phase 3.13 is the latest completed local phase. It implements the XMLA ADOMD
+adapter path behind `XmlaClient`, builds encoded Power BI XMLA workspace
+endpoints, uses an ADOMD access token, queries TMSCHEMA rowsets, maps raw XMLA
+metadata into the existing metadata contract, and redacts access tokens from
+XMLA failure details.
 
 ### Next Phase
 
-Phase 3.13 - Implement XMLA Transport Adapter is the next phase.
+Phase 3.14 - Live XMLA validation and semantic metadata merge is the next
+phase.
 
-Recommended Phase 3.13 work:
+Recommended Phase 3.14 work:
 
-- Choose and wire the XMLA transport dependency.
-- Implement live metadata extraction through the `XmlaClient` boundary.
-- Keep extracted XMLA metadata separate from Fabric TMDL parsing until the merge
-  contract is explicit.
+- Validate XMLA extraction against a Premium, PPU, or Fabric capacity with XMLA
+  enabled.
+- Confirm workspace naming, tenant naming, and semantic model `Initial Catalog`
+  behavior with real workspaces.
+- Decide how XMLA metadata should merge with Fabric TMDL parsing in lineage
+  responses.
 
 ## Current Review Notes
 
-Phase 3.6 through Phase 3.12.2 are locally verified with Ruff and pytest. The
+Phase 3.6 through Phase 3.13 are locally verified with Ruff and pytest. The
 only current test-suite warning is a third-party FastAPI/TestClient warning
 about Starlette's `httpx` integration.
 
