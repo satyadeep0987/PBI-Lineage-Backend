@@ -12,6 +12,7 @@ from app.schemas.report_page import (
 )
 from app.schemas.report_semantic_lineage import (
     ReportSemanticLineageResponse,
+    SemanticLineageDiagnosticsSummary,
 )
 from app.schemas.semantic_model_definition import (
     SemanticModelDefinition,
@@ -356,6 +357,14 @@ def test_get_report_semantic_lineage(
             total_field_reference_count=1,
             matched_field_reference_count=1,
             unmatched_field_reference_count=0,
+            diagnostics_summary=(
+                SemanticLineageDiagnosticsSummary(
+                    status_counts={
+                        "matched": 1,
+                        "unmatched": 0,
+                    }
+                )
+            ),
         )
 
     monkeypatch.setattr(
@@ -391,4 +400,13 @@ def test_get_report_semantic_lineage(
     assert (
         payload["matched_field_reference_count"]
         == 1
+    )
+    assert (
+        payload["diagnostics_summary"][
+            "status_counts"
+        ]
+        == {
+            "matched": 1,
+            "unmatched": 0,
+        }
     )

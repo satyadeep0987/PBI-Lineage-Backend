@@ -21,6 +21,36 @@ class SemanticLineageObject(BaseModel):
     level_name: str | None = None
 
 
+class SemanticLineageCandidate(BaseModel):
+    semantic_object: SemanticLineageObject
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+    reason: str
+
+
+class SemanticLineageDiagnosticsSummary(BaseModel):
+    status_counts: dict[str, int] = Field(
+        default_factory=dict
+    )
+    field_reference_object_type_counts: dict[
+        str,
+        int,
+    ] = Field(
+        default_factory=dict
+    )
+    match_counts_by_object_type: dict[
+        str,
+        dict[str, int],
+    ] = Field(
+        default_factory=dict
+    )
+    reason_counts: dict[str, int] = Field(
+        default_factory=dict
+    )
+
+
 class SemanticLineageFieldMatch(BaseModel):
     page_name: str
     page_display_name: str
@@ -36,6 +66,16 @@ class SemanticLineageFieldMatch(BaseModel):
     ]
     semantic_object: SemanticLineageObject | None = None
     reason: str | None = None
+    match_confidence: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+    )
+    candidate_suggestions: list[
+        SemanticLineageCandidate
+    ] = Field(
+        default_factory=list
+    )
 
 
 class ReportSemanticLineageResponse(BaseModel):
@@ -50,6 +90,13 @@ class ReportSemanticLineageResponse(BaseModel):
 
     field_matches: list[SemanticLineageFieldMatch] = Field(
         default_factory=list
+    )
+    diagnostics_summary: (
+        SemanticLineageDiagnosticsSummary
+    ) = Field(
+        default_factory=(
+            SemanticLineageDiagnosticsSummary
+        )
     )
     warnings: list[str] = Field(
         default_factory=list

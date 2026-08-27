@@ -219,6 +219,15 @@ def test_match_report_fields_to_semantic_model_objects():
         "definition/tables/Sales.tmdl",
         "definition/tables/Date.tmdl",
     ]
+    assert [
+        field_match.match_confidence
+        for field_match in result.field_matches
+    ] == [
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+    ]
 
     unmatched = [
         field_match
@@ -231,6 +240,50 @@ def test_match_report_fields_to_semantic_model_objects():
         unmatched[0].reason
         == "object_not_found"
     )
+    assert (
+        unmatched[0].candidate_suggestions
+        == []
+    )
+    assert (
+        result.diagnostics_summary.status_counts
+        == {
+            "matched": 3,
+            "unmatched": 1,
+        }
+    )
+    assert (
+        result.diagnostics_summary
+        .field_reference_object_type_counts
+        == {
+            "column": 2,
+            "hierarchy_level": 1,
+            "measure": 1,
+        }
+    )
+    assert (
+        result.diagnostics_summary
+        .match_counts_by_object_type
+        == {
+            "column": {
+                "matched": 1,
+                "unmatched": 1,
+            },
+            "hierarchy_level": {
+                "matched": 1,
+                "unmatched": 0,
+            },
+            "measure": {
+                "matched": 1,
+                "unmatched": 0,
+            },
+        }
+    )
+    assert (
+        result.diagnostics_summary.reason_counts
+        == {
+            "object_not_found": 1,
+        }
+    )
     assert result.warnings == [
         "Report warning.",
         (
@@ -238,6 +291,107 @@ def test_match_report_fields_to_semantic_model_objects():
             "(definition/model.tmdl)"
         ),
     ]
+
+
+def test_unmatched_field_includes_candidate_suggestions():
+    service = ReportSemanticLineageService()
+    report = _normalized_report()
+    field_reference = (
+        report.pages[0]
+        .visuals[0]
+        .field_references[3]
+    )
+    field_reference.table_name = "Product"
+    field_reference.object_name = "Catgory"
+
+    result = service.match(
+        report=report,
+        semantic_model=(
+            _parsed_semantic_model()
+        ),
+        semantic_model_workspace_id=(
+            "model-workspace"
+        ),
+    )
+
+    unmatched = [
+        field_match
+        for field_match in result.field_matches
+        if field_match.status == "unmatched"
+    ]
+
+    assert len(unmatched) == 1
+    assert (
+        unmatched[0].reason
+        == "object_not_found"
+    )
+    assert (
+        unmatched[0].match_confidence
+        == 0.0
+    )
+
+    candidate = (
+        unmatched[0]
+        .candidate_suggestions[0]
+    )
+
+    assert candidate.reason == (
+        "same_table_similar_object"
+    )
+    assert candidate.confidence >= 0.85
+    assert (
+        candidate.semantic_object.table_name
+        == "Product"
+    )
+    assert (
+        candidate.semantic_object.object_name
+        == "Category"
+    )
+
+
+def test_missing_hierarchy_name_has_specific_reason():
+    service = ReportSemanticLineageService()
+    report = _normalized_report()
+    field_reference = (
+        report.pages[0]
+        .visuals[0]
+        .field_references[2]
+    )
+    field_reference.hierarchy_name = None
+
+    result = service.match(
+        report=report,
+        semantic_model=(
+            _parsed_semantic_model()
+        ),
+        semantic_model_workspace_id=(
+            "model-workspace"
+        ),
+    )
+
+    hierarchy_match = next(
+        field_match
+        for field_match in result.field_matches
+        if (
+            field_match
+            .field_reference
+            .object_type
+            == "hierarchy_level"
+        )
+    )
+
+    assert hierarchy_match.status == "unmatched"
+    assert (
+        hierarchy_match.reason
+        == "missing_hierarchy_name"
+    )
+    assert (
+        hierarchy_match
+        .candidate_suggestions[0]
+        .semantic_object
+        .hierarchy_name
+        == "Calendar"
+    )
 
 
 @pytest.mark.asyncio

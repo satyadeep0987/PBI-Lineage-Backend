@@ -31,12 +31,13 @@ Current capabilities:
 - Parses TMDL semantic model definitions into tables, columns, measures,
   relationships, and hierarchies.
 - Carries semantic model source-path evidence into lineage matches.
+- Adds lineage diagnostics with match confidence, candidate suggestions, and
+  summary counts by status and object type.
 - Exposes provider authentication/scope diagnostics.
 
 Future capabilities:
 
 - Improve semantic model parser coverage for more TMDL shapes.
-- Improve lineage diagnostics with match confidence and suggested candidates.
 - Add XMLA metadata extraction.
 - Add Snowflake lineage.
 - Add impact analysis APIs.
@@ -164,7 +165,9 @@ POST /api/v1/workspaces/{workspace_id}/semantic-models/{semantic_model_id}/defin
 POST /api/v1/workspaces/{workspace_id}/reports/{report_id}/semantic-lineage
 ```
 
-The semantic model definition endpoint is part of the current uncommitted phase.
+The semantic-lineage endpoint returns visual field matches, source-path
+evidence, match confidence, candidate suggestions for unmatched fields, and a
+diagnostics summary.
 
 ## Folder Structure
 
@@ -270,9 +273,15 @@ Pydantic API contracts.
   - Raw Fabric report definition response.
 - `semantic_model_definition.py`
   - Raw Fabric semantic model definition response.
+- `parsed_semantic_model.py`
+  - Parsed TMDL semantic model response with tables, columns, measures,
+    relationships, hierarchies, warnings, and source-path evidence.
 - `normalized_report_definition.py`
   - API shape for normalized PBIR reports, pages, visuals, positions, semantic
     model references, and visual field references.
+- `report_semantic_lineage.py`
+  - API shape for report visual field to semantic model object lineage,
+    diagnostics, match confidence, and candidate suggestions.
 - `auth.py`
   - Microsoft auth requests, device flow responses, provider connection status,
     and scope diagnostics.
@@ -297,6 +306,11 @@ Business logic layer. Routes call services; services call clients.
 - `semantic_model_definition_service.py`
   - Retrieves Fabric semantic model definitions and handles long-running
     operations.
+- `semantic_model_definition_parser.py`
+  - Parses TMDL semantic model definition parts into API-ready semantic objects.
+- `report_semantic_lineage_service.py`
+  - Matches normalized report visual field references to parsed semantic model
+    objects and produces diagnostics.
 - `report_definition_decoder.py`
   - Decodes structural JSON definition parts from base64 payloads.
 - `report_definition_normalizer.py`
@@ -338,6 +352,12 @@ Automated tests.
   - Fabric report definition immediate and long-running behavior.
 - `tests/unit/test_semantic_model_definition_service.py`
   - Fabric semantic model definition behavior.
+- `tests/unit/test_fabric_client.py`
+  - Fabric report and semantic model definition URL/query construction.
+- `tests/unit/test_semantic_model_definition_parser.py`
+  - Parsed TMDL semantic model behavior.
+- `tests/unit/test_report_semantic_lineage_service.py`
+  - Report visual field to semantic model object matching and diagnostics.
 - `tests/unit/test_report_definition_decoder.py`
   - Base64/JSON definition decoding.
 - `tests/unit/test_report_definition_normalizer.py`
@@ -371,27 +391,29 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.8 | Completed locally | Added parsed semantic model definition output. |
 | Aug 28, 2026 | Phase 3.9 | Completed locally | Added report visual field to semantic model object matching. |
 | Aug 28, 2026 | Phase 3.10 | Completed locally | Improved TMDL parser fidelity and source-path evidence. |
+| Aug 28, 2026 | Phase 3.11 | Completed locally | Added lineage diagnostics, candidate suggestions, and summary counts. |
 
 ### Latest Completed Phase
 
-Phase 3.10 is the latest completed local phase. It improves TMDL parsing for
-quoted names, `:` and `=` property formats, strict Base64 payload validation,
-multiline measure expressions, ignored unmapped properties, and source-path
-evidence on parsed and matched semantic model objects.
+Phase 3.11 is the latest completed local phase. It adds per-field
+`match_confidence`, candidate suggestions for unmatched visual fields, clearer
+hierarchy-level unmatched reasons, and `diagnostics_summary` counts by status,
+object type, and reason.
 
 ### Next Phase
 
-Phase 3.11 - Improve Lineage Diagnostics is the next phase.
+Phase 3.12 - Prepare XMLA Metadata Extraction is the next phase.
 
-Recommended Phase 3.11 work:
+Recommended Phase 3.12 work:
 
-- Add clearer unmatched reasons.
-- Add optional candidate suggestions for unmatched visual fields.
-- Add summary counts by object type and match status.
+- Define XMLA metadata response schemas.
+- Add a provider boundary for XMLA connection/configuration.
+- Keep XMLA semantic metadata separate from Fabric definition parsing until the
+  merge contract is explicit.
 
 ## Current Review Notes
 
-Phase 3.6 through Phase 3.10 are locally verified with Ruff and pytest. The
+Phase 3.6 through Phase 3.11 are locally verified with Ruff and pytest. The
 only current test-suite warning is a third-party FastAPI/TestClient warning
 about Starlette's `httpx` integration.
 
