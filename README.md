@@ -28,13 +28,15 @@ Current capabilities:
 - Extracts visual field references for columns, measures, hierarchies, sorts,
   filters, and projections.
 - Retrieves Fabric semantic model definitions in TMDL/TMSL format.
+- Parses TMDL semantic model definitions into tables, columns, measures,
+  relationships, and hierarchies.
+- Carries semantic model source-path evidence into lineage matches.
 - Exposes provider authentication/scope diagnostics.
 
 Future capabilities:
 
-- Parse semantic model definitions into tables, columns, measures,
-  relationships, hierarchies, and expressions.
-- Join report visual field usage to semantic model objects.
+- Improve semantic model parser coverage for more TMDL shapes.
+- Improve lineage diagnostics with match confidence and suggested candidates.
 - Add XMLA metadata extraction.
 - Add Snowflake lineage.
 - Add impact analysis APIs.
@@ -368,28 +370,30 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.7 | Completed locally | Finalized semantic model definition retrieval coverage. |
 | Aug 28, 2026 | Phase 3.8 | Completed locally | Added parsed semantic model definition output. |
 | Aug 28, 2026 | Phase 3.9 | Completed locally | Added report visual field to semantic model object matching. |
+| Aug 28, 2026 | Phase 3.10 | Completed locally | Improved TMDL parser fidelity and source-path evidence. |
 
 ### Latest Completed Phase
 
-Phase 3.9 is the latest completed local phase. It joins normalized report
-visual field references to parsed semantic model columns, measures, hierarchies,
-and hierarchy levels.
+Phase 3.10 is the latest completed local phase. It improves TMDL parsing for
+quoted names, `:` and `=` property formats, strict Base64 payload validation,
+multiline measure expressions, ignored unmapped properties, and source-path
+evidence on parsed and matched semantic model objects.
 
 ### Next Phase
 
-Phase 3.10 - Improve Semantic Model Parsing is the next phase.
+Phase 3.11 - Improve Lineage Diagnostics is the next phase.
 
-Recommended Phase 3.10 work:
+Recommended Phase 3.11 work:
 
-- Improve TMDL parsing for multiline expressions and more property formats.
-- Add richer unmatched lineage diagnostics.
-- Add evidence fields for matched semantic objects.
+- Add clearer unmatched reasons.
+- Add optional candidate suggestions for unmatched visual fields.
+- Add summary counts by object type and match status.
 
 ## Current Review Notes
 
-Phase 3.6 through Phase 3.9 are locally verified with Ruff and pytest. The only
-current test-suite warning is a third-party FastAPI/TestClient warning about
-Starlette's `httpx` integration.
+Phase 3.6 through Phase 3.10 are locally verified with Ruff and pytest. The
+only current test-suite warning is a third-party FastAPI/TestClient warning
+about Starlette's `httpx` integration.
 
 ## Development Notes
 

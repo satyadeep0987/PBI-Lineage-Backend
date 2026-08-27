@@ -9,6 +9,7 @@ class ParsedSemanticModelWarning(BaseModel):
 
 class ParsedSemanticModelColumn(BaseModel):
     name: str
+    source_path: str | None = None
     data_type: str | None = None
     source_column: str | None = None
     expression: str | None = None
@@ -17,6 +18,7 @@ class ParsedSemanticModelColumn(BaseModel):
 
 class ParsedSemanticModelMeasure(BaseModel):
     name: str
+    source_path: str | None = None
     expression: str | None = None
     format_string: str | None = None
     is_hidden: bool | None = None
@@ -24,6 +26,7 @@ class ParsedSemanticModelMeasure(BaseModel):
 
 class ParsedSemanticModelRelationship(BaseModel):
     name: str | None = None
+    source_path: str | None = None
     from_table: str | None = None
     from_column: str | None = None
     to_table: str | None = None
@@ -35,16 +38,19 @@ class ParsedSemanticModelRelationship(BaseModel):
 
 class ParsedSemanticModelHierarchyLevel(BaseModel):
     name: str
+    source_path: str | None = None
     column: str | None = None
 
 
 class ParsedSemanticModelHierarchy(BaseModel):
     name: str
+    source_path: str | None = None
     levels: list[ParsedSemanticModelHierarchyLevel] = Field(default_factory=list)
 
 
 class ParsedSemanticModelTable(BaseModel):
     name: str
+    source_path: str | None = None
     columns: list[ParsedSemanticModelColumn] = Field(default_factory=list)
     measures: list[ParsedSemanticModelMeasure] = Field(default_factory=list)
     hierarchies: list[ParsedSemanticModelHierarchy] = Field(default_factory=list)

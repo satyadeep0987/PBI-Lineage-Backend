@@ -59,6 +59,10 @@ table Sales
     assert result.format == "TMDL"
     assert len(result.tables) == 1
     assert result.tables[0].name == "Sales"
+    assert (
+        result.tables[0].source_path
+        == "definition/tables/Sales.tmdl"
+    )
 
 
 def test_parse_tmdl_column():
@@ -82,6 +86,10 @@ table Sales
     assert column.data_type == "decimal"
     assert column.source_column == "Amount"
     assert column.is_hidden is False
+    assert (
+        column.source_path
+        == "definition/tables/Sales.tmdl"
+    )
 
 
 def test_parse_tmdl_measure():
@@ -104,6 +112,72 @@ table Sales
     assert measure.expression == "SUM(Sales[Amount])"
     assert measure.format_string == "$#,0.00"
     assert measure.is_hidden is False
+    assert (
+        measure.source_path
+        == "definition/tables/Sales.tmdl"
+    )
+
+
+def test_parse_tmdl_quoted_names_and_multiline_measure_expression():
+    raw = _raw_definition(
+        text="""
+table 'Sales Data'
+    column 'Order Amount'
+        dataType = decimal
+        sourceColumn = 'Order Amount'
+        isHidden = true
+    measure 'Total Sales' =
+        SUMX(
+            Sales,
+            Sales[Amount]
+        )
+        formatString = '$#,0.00'
+"""
+    )
+
+    result = SemanticModelDefinitionParser().parse(
+        raw
+    )
+
+    table = result.tables[0]
+    column = table.columns[0]
+    measure = table.measures[0]
+
+    assert table.name == "Sales Data"
+    assert column.name == "Order Amount"
+    assert column.source_column == "Order Amount"
+    assert column.is_hidden is True
+    assert measure.name == "Total Sales"
+    assert measure.expression == (
+        "SUMX(\n"
+        "Sales,\n"
+        "Sales[Amount]\n"
+        ")"
+    )
+    assert measure.format_string == "$#,0.00"
+
+
+def test_parse_tmdl_multiline_measure_ignores_unmapped_properties():
+    raw = _raw_definition(
+        text="""
+table Sales
+    measure Total Sales =
+        VAR Total = SUM(Sales[Amount])
+        RETURN Total
+        displayFolder = Finance
+"""
+    )
+
+    result = SemanticModelDefinitionParser().parse(
+        raw
+    )
+
+    measure = result.tables[0].measures[0]
+
+    assert measure.expression == (
+        "VAR Total = SUM(Sales[Amount])\n"
+        "RETURN Total"
+    )
 
 
 def test_parse_tmdl_relationship():
@@ -134,6 +208,10 @@ relationship SalesCustomer
     assert (
         relationship.cross_filter_direction
         == "bothDirections"
+    )
+    assert (
+        relationship.source_path
+        == "definition/tables/Sales.tmdl"
     )
 
 

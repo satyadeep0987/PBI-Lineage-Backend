@@ -94,17 +94,29 @@ def _parsed_semantic_model() -> ParsedSemanticModelResponse:
         tables=[
             ParsedSemanticModelTable(
                 name="Product",
+                source_path=(
+                    "definition/tables/Product.tmdl"
+                ),
                 columns=[
                     ParsedSemanticModelColumn(
-                        name="Category"
+                        name="Category",
+                        source_path=(
+                            "definition/tables/Product.tmdl"
+                        ),
                     )
                 ],
             ),
             ParsedSemanticModelTable(
                 name="Sales",
+                source_path=(
+                    "definition/tables/Sales.tmdl"
+                ),
                 measures=[
                     ParsedSemanticModelMeasure(
                         name="Total Sales",
+                        source_path=(
+                            "definition/tables/Sales.tmdl"
+                        ),
                         expression=(
                             "SUM(Sales[Amount])"
                         ),
@@ -113,12 +125,21 @@ def _parsed_semantic_model() -> ParsedSemanticModelResponse:
             ),
             ParsedSemanticModelTable(
                 name="Date",
+                source_path=(
+                    "definition/tables/Date.tmdl"
+                ),
                 hierarchies=[
                     ParsedSemanticModelHierarchy(
                         name="Calendar",
+                        source_path=(
+                            "definition/tables/Date.tmdl"
+                        ),
                         levels=[
                             ParsedSemanticModelHierarchyLevel(
                                 name="Year",
+                                source_path=(
+                                    "definition/tables/Date.tmdl"
+                                ),
                                 column="Year",
                             )
                         ],
@@ -188,6 +209,15 @@ def test_match_report_fields_to_semantic_model_objects():
         "column",
         "measure",
         "hierarchy_level",
+    ]
+    assert [
+        item.source_path
+        for item in matched_objects
+        if item is not None
+    ] == [
+        "definition/tables/Product.tmdl",
+        "definition/tables/Sales.tmdl",
+        "definition/tables/Date.tmdl",
     ]
 
     unmatched = [

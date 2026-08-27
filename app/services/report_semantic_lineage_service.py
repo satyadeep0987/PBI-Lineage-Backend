@@ -349,6 +349,10 @@ class _SemanticModelIndex:
                         object_type="column",
                         table_name=table.name,
                         object_name=column.name,
+                        source_path=(
+                            column.source_path
+                            or table.source_path
+                        ),
                     )
                 )
 
@@ -395,6 +399,10 @@ class _SemanticModelIndex:
                     object_type="measure",
                     table_name=table.name,
                     object_name=measure.name,
+                    source_path=(
+                        measure.source_path
+                        or table.source_path
+                    ),
                 )
 
         return index
@@ -422,6 +430,10 @@ class _SemanticModelIndex:
                     object_type="hierarchy",
                     table_name=table.name,
                     object_name=hierarchy.name,
+                    source_path=(
+                        hierarchy.source_path
+                        or table.source_path
+                    ),
                     hierarchy_name=hierarchy.name,
                 )
 
@@ -478,6 +490,11 @@ class _SemanticModelIndex:
                 object_type="hierarchy_level",
                 table_name=table.name,
                 object_name=level.name,
+                source_path=(
+                    level.source_path
+                    or hierarchy.source_path
+                    or table.source_path
+                ),
                 hierarchy_name=hierarchy.name,
                 level_name=level.name,
             )

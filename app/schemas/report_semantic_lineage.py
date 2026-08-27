@@ -16,6 +16,7 @@ class SemanticLineageObject(BaseModel):
     ]
     table_name: str
     object_name: str
+    source_path: str | None = None
     hierarchy_name: str | None = None
     level_name: str | None = None
 
