@@ -55,7 +55,7 @@ class ReportSemanticLineageService:
         semantic_model_workspace_id: str,
         semantic_model_id: str,
         access_token: str,
-        report_definition_format: str | None = "TMDL",
+        report_definition_format: str | None = "PBIR",
         semantic_model_definition_format: str = "TMDL",
     ) -> ReportSemanticLineageResponse:
         report = await (

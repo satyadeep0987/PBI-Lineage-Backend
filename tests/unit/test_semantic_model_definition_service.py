@@ -359,7 +359,15 @@ async def test_lro_semantic_model_definition_failed_status(
             return_value=httpx.Response(
                 status_code=200,
                 json={
-                    "status": "Failed"
+                    "status": "Failed",
+                    "error": {
+                        "errorCode": (
+                            "OperationFailed"
+                        ),
+                        "message": (
+                            "Semantic model export failed."
+                        ),
+                    },
                 },
             )
         )
@@ -379,9 +387,17 @@ async def test_lro_semantic_model_definition_failed_status(
 
     with pytest.raises(
         UpstreamRequestError
-    ):
+    ) as exc_info:
         await service.get_definition(
             workspace_id="workspace-123",
             semantic_model_id="model-123",
             access_token="token",
         )
+
+    assert "OperationFailed" in (
+        exc_info.value.message
+    )
+    assert (
+        "Semantic model export failed."
+        in exc_info.value.message
+    )

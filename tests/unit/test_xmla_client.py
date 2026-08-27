@@ -48,3 +48,7 @@ async def test_xmla_metadata_boundary_is_not_configured():
     assert exc_info.value.code == (
         "PROVIDER_INTEGRATION_NOT_CONFIGURED"
     )
+    assert (
+        "Configure a live XMLA transport adapter"
+        in exc_info.value.message
+    )

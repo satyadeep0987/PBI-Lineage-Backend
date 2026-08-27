@@ -7,6 +7,9 @@ import httpx
 from app.clients.fabric_client import (
     FabricClient,
 )
+from app.clients.provider_http_client import (
+    provider_error_detail_from_payload,
+)
 from app.core.exceptions import (
     UpstreamInvalidResponseError,
     UpstreamRequestError,
@@ -108,7 +111,12 @@ class ReportDefinitionService:
 
             if status == "Failed":
                 raise UpstreamRequestError(
-                    "fabric"
+                    "fabric",
+                    detail=(
+                        provider_error_detail_from_payload(
+                            payload
+                        )
+                    ),
                 )
 
             if not isinstance(
@@ -335,7 +343,7 @@ class ReportDefinitionService:
         workspace_id: str,
         report_id: str,
         access_token: str,
-        definition_format: str | None = None,
+        definition_format: str | None = "PBIR",
     ) -> ReportDefinitionResponse:
         response = (
             await self.client
@@ -378,7 +386,7 @@ class ReportDefinitionService:
         workspace_id: str,
         report_id: str,
         access_token: str,
-        definition_format: str | None = None,
+        definition_format: str | None = "PBIR",
     ) -> NormalizedReportDefinitionResponse:
         raw_definition = (
             await self.get_definition(

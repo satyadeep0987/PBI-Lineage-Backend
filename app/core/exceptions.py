@@ -101,13 +101,24 @@ class UpstreamUnavailableError(AppException):
 
 
 class UpstreamRequestError(AppException):
-    def __init__(self, provider: str) -> None:
+    def __init__(
+        self,
+        provider: str,
+        detail: str | None = None,
+    ) -> None:
+        message = (
+            f"The request to {_provider_label(provider)} "
+            "could not be completed."
+        )
+
+        if detail:
+            message = (
+                f"{message} {detail}"
+            )
+
         super().__init__(
             code="UPSTREAM_REQUEST_FAILED",
-            message=(
-                f"The request to {_provider_label(provider)} "
-                "could not be completed."
-            ),
+            message=message,
             status_code=status.HTTP_502_BAD_GATEWAY,
             provider=provider,
         )
@@ -119,15 +130,23 @@ class ProviderIntegrationNotConfiguredError(
     def __init__(
         self,
         provider: str,
+        detail: str | None = None,
     ) -> None:
+        message = (
+            f"{_provider_label(provider)} "
+            "integration is not configured."
+        )
+
+        if detail:
+            message = (
+                f"{message} {detail}"
+            )
+
         super().__init__(
             code=(
                 "PROVIDER_INTEGRATION_NOT_CONFIGURED"
             ),
-            message=(
-                f"{_provider_label(provider)} "
-                "integration is not configured."
-            ),
+            message=message,
             status_code=(
                 status.HTTP_501_NOT_IMPLEMENTED
             ),

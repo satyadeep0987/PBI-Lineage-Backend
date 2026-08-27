@@ -35,6 +35,9 @@ Current capabilities:
   summary counts by status and object type.
 - Defines XMLA semantic model metadata contracts and a service/client boundary.
 - Exposes provider authentication/scope diagnostics.
+- Validates Fabric report definition formats separately from semantic model
+  definition formats.
+- Surfaces provider error details for Fabric request and operation failures.
 
 Future capabilities:
 
@@ -166,9 +169,26 @@ POST /api/v1/workspaces/{workspace_id}/semantic-models/{semantic_model_id}/defin
 POST /api/v1/workspaces/{workspace_id}/reports/{report_id}/semantic-lineage
 ```
 
+Report definition endpoints accept `format=PBIR` or `format=PBIR-Legacy`.
+The default is `PBIR`.
+
+Semantic model definition endpoints accept `format=TMDL` or `format=TMSL`.
+The default is `TMDL`.
+
 The semantic-lineage endpoint returns visual field matches, source-path
 evidence, match confidence, candidate suggestions for unmatched fields, and a
 diagnostics summary.
+
+Semantic-lineage query parameters:
+
+- `semantic_model_id` is required.
+- `semantic_model_workspace_id` is optional and defaults to the report
+  workspace.
+- `reportFormat` accepts `PBIR` or `PBIR-Legacy` and defaults to `PBIR`.
+- `semanticModelFormat` accepts `TMDL` or `TMSL` and defaults to `TMDL`.
+
+Do not pass `reportFormat=TMDL`; `TMDL` is only valid for semantic model
+definitions.
 
 ### XMLA Metadata
 
@@ -183,7 +203,8 @@ Optional query parameters:
 
 This endpoint defines the XMLA metadata response contract and service/client
 boundary. The live XMLA transport adapter is still pending, so the default
-client returns a configured integration error until the adapter is implemented.
+client returns `PROVIDER_INTEGRATION_NOT_CONFIGURED` with a transport-adapter
+configuration message until the adapter is implemented.
 
 ## Folder Structure
 
@@ -239,15 +260,20 @@ Provider clients. These files should know provider URL/protocol details but
 should not contain business normalization logic.
 
 - `provider_http_client.py`
-  - Shared HTTP behavior and provider error mapping.
+  - Shared HTTP behavior, provider error mapping, and upstream error-detail
+    extraction.
 - `powerbi_client.py`
   - Power BI REST API client.
 - `fabric_client.py`
   - Microsoft Fabric API client.
   - Handles report and semantic model definition endpoints and long-running
     operation result APIs.
+  - Uses `PBIR` by default for report definitions and `TMDL` by default for
+    semantic model definitions.
 - `xmla_client.py`
   - XMLA endpoint convention and future adapter boundary.
+  - Raises a configured integration error until a live XMLA transport adapter is
+    wired.
 - `snowflake_client.py`
   - Placeholder for future Snowflake integration.
 
@@ -325,9 +351,13 @@ Business logic layer. Routes call services; services call clients.
   - Maps Power BI datasets/semantic models.
 - `report_definition_service.py`
   - Retrieves Fabric report definitions and handles long-running operations.
+  - Defaults report definition extraction to `PBIR`.
+  - Preserves Fabric operation failure details when available.
 - `semantic_model_definition_service.py`
   - Retrieves Fabric semantic model definitions and handles long-running
     operations.
+  - Defaults semantic model definition extraction to `TMDL`.
+  - Preserves Fabric operation failure details when available.
 - `semantic_model_definition_parser.py`
   - Parses TMDL semantic model definition parts into API-ready semantic objects.
 - `report_semantic_lineage_service.py`
@@ -378,6 +408,8 @@ Automated tests.
   - Fabric semantic model definition behavior.
 - `tests/unit/test_fabric_client.py`
   - Fabric report and semantic model definition URL/query construction.
+- `tests/unit/test_provider_http_client.py`
+  - Provider HTTP error mapping and upstream diagnostic detail extraction.
 - `tests/unit/test_semantic_model_definition_parser.py`
   - Parsed TMDL semantic model behavior.
 - `tests/unit/test_report_semantic_lineage_service.py`
@@ -421,12 +453,16 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.10 | Completed locally | Improved TMDL parser fidelity and source-path evidence. |
 | Aug 28, 2026 | Phase 3.11 | Completed locally | Added lineage diagnostics, candidate suggestions, and summary counts. |
 | Aug 28, 2026 | Phase 3.12 | Completed locally | Added XMLA metadata contracts and service/client boundary. |
+| Aug 28, 2026 | Phase 3.12.1 | Completed locally | Corrected Fabric report definition formats to default to PBIR and reject semantic-model-only formats. |
+| Aug 28, 2026 | Phase 3.12.2 | Completed locally | Added upstream provider diagnostic detail for Fabric request and operation failures. |
 
 ### Latest Completed Phase
 
-Phase 3.12 is the latest completed local phase. It adds XMLA semantic model
-metadata response contracts, a Power BI-authenticated XMLA metadata route, an
-XMLA client boundary, and service-level mapping/validation.
+Phase 3.12.2 is the latest completed local phase. It stabilizes the Phase 3.12
+contracts by separating report and semantic model definition formats, defaulting
+report definitions to `PBIR`, rejecting invalid lineage format combinations at
+the route layer, and preserving Fabric provider details when requests or
+long-running operations fail.
 
 ### Next Phase
 
@@ -441,7 +477,7 @@ Recommended Phase 3.13 work:
 
 ## Current Review Notes
 
-Phase 3.6 through Phase 3.12 are locally verified with Ruff and pytest. The
+Phase 3.6 through Phase 3.12.2 are locally verified with Ruff and pytest. The
 only current test-suite warning is a third-party FastAPI/TestClient warning
 about Starlette's `httpx` integration.
 

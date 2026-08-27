@@ -262,13 +262,14 @@ async def get_workspace_report_definition(
         ),
     ],
     definition_format: Annotated[
-        str | None,
+        Literal[
+            "PBIR",
+            "PBIR-Legacy",
+        ],
         Query(
             alias="format",
-            min_length=1,
-            max_length=64,
         ),
-    ] = "TMDL",
+    ] = "PBIR",
 ) -> ReportDefinitionResponse:
     service = (
         ReportDefinitionService()
@@ -306,13 +307,14 @@ async def get_normalized_report_definition(
         ),
     ],
     definition_format: Annotated[
-        str | None,
+        Literal[
+            "PBIR",
+            "PBIR-Legacy",
+        ],
         Query(
             alias="format",
-            min_length=1,
-            max_length=64,
         ),
-    ] = "TMDL",
+    ] = "PBIR",
 ) -> NormalizedReportDefinitionResponse:
     service = (
         ReportDefinitionService()
@@ -484,13 +486,14 @@ async def get_workspace_report_semantic_lineage(
         Query(),
     ] = None,
     report_definition_format: Annotated[
-        str | None,
+        Literal[
+            "PBIR",
+            "PBIR-Legacy",
+        ],
         Query(
             alias="reportFormat",
-            min_length=1,
-            max_length=64,
         ),
-    ] = "TMDL",
+    ] = "PBIR",
     semantic_model_definition_format: Annotated[
         Literal[
             "TMDL",

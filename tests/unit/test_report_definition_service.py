@@ -5,6 +5,7 @@ import pytest
 
 from app.core.exceptions import (
     UpstreamInvalidResponseError,
+    UpstreamRequestError,
 )
 from app.services.report_definition_service import (
     ReportDefinitionService,
@@ -77,6 +78,16 @@ async def test_immediate_report_definition():
     assert (
         part.payload_type
         == "InlineBase64"
+    )
+
+    (
+        service.client.start_report_definition
+        .assert_awaited_once_with(
+            workspace_id="workspace-1",
+            report_id="report-1",
+            access_token="fake-token",
+            definition_format="PBIR",
+        )
     )
 
 
@@ -266,3 +277,72 @@ async def test_lro_report_definition_success(
 
     service.client.get_operation_result \
         .assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_lro_report_definition_failed_status_includes_detail(
+    monkeypatch,
+):
+    service = (
+        ReportDefinitionService()
+    )
+
+    service.client.start_report_definition = (
+        AsyncMock(
+            return_value=httpx.Response(
+                status_code=202,
+                headers={
+                    "x-ms-operation-id": (
+                        "operation-123"
+                    ),
+                    "Retry-After": "1",
+                },
+            )
+        )
+    )
+    service.client.get_operation_state = (
+        AsyncMock(
+            return_value=httpx.Response(
+                status_code=200,
+                json={
+                    "status": "Failed",
+                    "error": {
+                        "errorCode": (
+                            "InvalidFormat"
+                        ),
+                        "message": (
+                            "Report format is invalid."
+                        ),
+                    },
+                },
+            )
+        )
+    )
+
+    async def no_wait(
+        _: float,
+    ) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "app.services."
+        "report_definition_service."
+        "asyncio.sleep",
+        no_wait,
+    )
+
+    with pytest.raises(
+        UpstreamRequestError
+    ) as exc_info:
+        await service.get_definition(
+            workspace_id="workspace-1",
+            report_id="report-1",
+            access_token="fake-token",
+        )
+
+    assert "InvalidFormat" in (
+        exc_info.value.message
+    )
+    assert "Report format is invalid." in (
+        exc_info.value.message
+    )

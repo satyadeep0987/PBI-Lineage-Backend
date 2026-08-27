@@ -422,8 +422,6 @@ async def test_build_lineage_uses_report_and_semantic_model_services():
         ),
         semantic_model_id="model-123",
         access_token="fabric-token",
-        report_definition_format="PBIR",
-        semantic_model_definition_format="TMDL",
     )
 
     assert (

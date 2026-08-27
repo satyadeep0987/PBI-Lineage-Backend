@@ -7,6 +7,9 @@ import httpx
 from app.clients.fabric_client import (
     FabricClient,
 )
+from app.clients.provider_http_client import (
+    provider_error_detail_from_payload,
+)
 from app.core.exceptions import (
     UpstreamInvalidResponseError,
     UpstreamRequestError,
@@ -110,7 +113,12 @@ class SemanticModelDefinitionService:
 
             if status == "Failed":
                 raise UpstreamRequestError(
-                    "fabric"
+                    "fabric",
+                    detail=(
+                        provider_error_detail_from_payload(
+                            payload
+                        )
+                    ),
                 )
 
             if not isinstance(

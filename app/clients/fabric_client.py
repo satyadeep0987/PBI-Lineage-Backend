@@ -58,7 +58,7 @@ class FabricClient:
         workspace_id: str,
         report_id: str,
         access_token: str,
-        definition_format: str | None = None,
+        definition_format: str | None = "PBIR",
     ) -> httpx.Response:
         params = None
 

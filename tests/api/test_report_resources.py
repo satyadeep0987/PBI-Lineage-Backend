@@ -6,6 +6,11 @@ from app.api.dependencies.credentials import (
 )
 from app.main import app
 from app.schemas.report import Report
+from app.schemas.report_definition import (
+    ReportDefinition,
+    ReportDefinitionPart,
+    ReportDefinitionResponse,
+)
 from app.schemas.report_page import (
     ReportPage,
     ReportPageListResponse,
@@ -22,6 +27,9 @@ from app.schemas.semantic_model_definition import (
 from app.schemas.xmla_metadata import (
     XmlaSemanticModelMetadataResponse,
     XmlaSemanticModelTable,
+)
+from app.services.report_definition_service import (
+    ReportDefinitionService,
 )
 from app.services.report_semantic_lineage_service import (
     ReportSemanticLineageService,
@@ -227,6 +235,85 @@ def test_invalid_report_uuid(
             f"{WORKSPACE_ID}/reports/"
             f"invalid-report-id"
         
+    )
+
+    assert response.status_code == 422
+
+
+def test_get_report_definition_uses_pbir_default(
+    client,
+    monkeypatch,
+):
+    async def fake_get_definition(
+        self,
+        *,
+        workspace_id: str,
+        report_id: str,
+        access_token: str,
+        definition_format: str,
+    ) -> ReportDefinitionResponse:
+        assert workspace_id == WORKSPACE_ID
+        assert report_id == REPORT_ID
+        assert access_token == "fake-fabric-token"
+        assert definition_format == "PBIR"
+
+        return ReportDefinitionResponse(
+            workspace_id=workspace_id,
+            report_id=report_id,
+            definition=ReportDefinition(
+                format=definition_format,
+                parts=[
+                    ReportDefinitionPart(
+                        path="definition.pbir",
+                        payload="e30=",
+                        payload_type=(
+                            "InlineBase64"
+                        ),
+                    )
+                ],
+            ),
+        )
+
+    monkeypatch.setattr(
+        ReportDefinitionService,
+        "get_definition",
+        fake_get_definition,
+    )
+
+    response = client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        f"reports/{REPORT_ID}/definition"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert (
+        payload["definition"]["format"]
+        == "PBIR"
+    )
+
+
+def test_report_definition_rejects_semantic_model_format(
+    client,
+):
+    response = client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        f"reports/{REPORT_ID}/definition"
+        "?format=TMDL"
+    )
+
+    assert response.status_code == 422
+
+
+def test_normalized_report_definition_rejects_semantic_model_format(
+    client,
+):
+    response = client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        f"reports/{REPORT_ID}/definition/normalized"
+        "?format=TMDL"
     )
 
     assert response.status_code == 422
@@ -461,7 +548,6 @@ def test_get_report_semantic_lineage(
         f"/api/v1/workspaces/{WORKSPACE_ID}/"
         f"reports/{REPORT_ID}/semantic-lineage"
         f"?semantic_model_id={SEMANTIC_MODEL_ID}"
-        "&reportFormat=PBIR"
         "&semanticModelFormat=TMDL"
         "&semantic_model_workspace_id="
         f"{expected_semantic_model_workspace_id}"
@@ -494,3 +580,29 @@ def test_get_report_semantic_lineage(
             "unmatched": 0,
         }
     )
+
+
+def test_report_semantic_lineage_rejects_semantic_model_format_for_report(
+    client,
+):
+    response = client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        f"reports/{REPORT_ID}/semantic-lineage"
+        f"?semantic_model_id={SEMANTIC_MODEL_ID}"
+        "&reportFormat=TMDL"
+    )
+
+    assert response.status_code == 422
+
+
+def test_report_semantic_lineage_rejects_report_format_for_semantic_model(
+    client,
+):
+    response = client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        f"reports/{REPORT_ID}/semantic-lineage"
+        f"?semantic_model_id={SEMANTIC_MODEL_ID}"
+        "&semanticModelFormat=PBIR"
+    )
+
+    assert response.status_code == 422

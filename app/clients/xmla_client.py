@@ -35,5 +35,10 @@ class XmlaClient:
         database_name: str | None = None,
     ) -> dict[str, Any]:
         raise ProviderIntegrationNotConfiguredError(
-            "xmla"
+            "xmla",
+            detail=(
+                "Configure a live XMLA transport "
+                "adapter before calling metadata "
+                "extraction."
+            ),
         )

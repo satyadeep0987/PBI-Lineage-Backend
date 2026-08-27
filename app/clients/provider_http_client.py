@@ -15,6 +15,94 @@ from app.core.exceptions import (
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
+def _optional_text(
+    payload: dict[str, Any],
+    key: str,
+) -> str | None:
+    value = payload.get(key)
+
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+
+    return None
+
+
+def provider_error_detail_from_payload(
+    payload: dict[str, Any],
+    *,
+    status_code: int | None = None,
+) -> str | None:
+    error = payload.get("error")
+
+    if isinstance(error, dict):
+        source = error
+
+    else:
+        source = payload
+
+    error_code = (
+        _optional_text(
+            source,
+            "errorCode",
+        )
+        or _optional_text(
+            source,
+            "code",
+        )
+    )
+    message = _optional_text(
+        source,
+        "message",
+    )
+
+    details: list[str] = []
+
+    if status_code is not None:
+        details.append(
+            f"Status {status_code}."
+        )
+
+    if error_code and message:
+        details.append(
+            f"{error_code}: {message}"
+        )
+
+    elif error_code:
+        details.append(error_code)
+
+    elif message:
+        details.append(message)
+
+    if not details:
+        return None
+
+    return " ".join(details)
+
+
+def _provider_error_detail_from_response(
+    response: httpx.Response,
+) -> str:
+    try:
+        payload = response.json()
+
+    except ValueError:
+        return f"Status {response.status_code}."
+
+    if not isinstance(
+        payload,
+        dict,
+    ):
+        return f"Status {response.status_code}."
+
+    return (
+        provider_error_detail_from_payload(
+            payload,
+            status_code=response.status_code,
+        )
+        or f"Status {response.status_code}."
+    )
+
+
 def _handle_provider_response(
     *,
     response: httpx.Response,
@@ -57,7 +145,12 @@ def _handle_provider_response(
         )
 
     raise UpstreamRequestError(
-        provider
+        provider,
+        detail=(
+            _provider_error_detail_from_response(
+                response
+            )
+        ),
     )
 
 
