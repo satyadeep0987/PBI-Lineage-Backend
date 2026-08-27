@@ -158,6 +158,8 @@ GET /api/v1/workspaces/{workspace_id}/semantic-models
 POST /api/v1/workspaces/{workspace_id}/reports/{report_id}/definition
 POST /api/v1/workspaces/{workspace_id}/reports/{report_id}/definition/normalized
 POST /api/v1/workspaces/{workspace_id}/semantic-models/{semantic_model_id}/definition
+POST /api/v1/workspaces/{workspace_id}/semantic-models/{semantic_model_id}/definition/parsed
+POST /api/v1/workspaces/{workspace_id}/reports/{report_id}/semantic-lineage
 ```
 
 The semantic model definition endpoint is part of the current uncommitted phase.
@@ -364,30 +366,28 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 26, 2026 | Phase 3.5 | Completed | Added visual semantic query and field reference extraction. |
 | Aug 28, 2026 | Phase 3.6 | Completed locally | Stabilized auth diagnostics and Fabric scope handling. |
 | Aug 28, 2026 | Phase 3.7 | Completed locally | Finalized semantic model definition retrieval coverage. |
+| Aug 28, 2026 | Phase 3.8 | Completed locally | Added parsed semantic model definition output. |
+| Aug 28, 2026 | Phase 3.9 | Completed locally | Added report visual field to semantic model object matching. |
 
 ### Latest Completed Phase
 
-Phase 3.7 is the latest completed local phase. It finalized semantic model
-definition retrieval by covering immediate Fabric responses, long-running
-operation responses, failed operation statuses, invalid payload handling, Fabric
-client URL/query construction, API route wiring, and `payloadType` response
-serialization.
+Phase 3.9 is the latest completed local phase. It joins normalized report
+visual field references to parsed semantic model columns, measures, hierarchies,
+and hierarchy levels.
 
 ### Next Phase
 
-Phase 3.8 - Parse Semantic Model Definition is the next phase.
+Phase 3.10 - Improve Semantic Model Parsing is the next phase.
 
-Recommended Phase 3.8 work:
+Recommended Phase 3.10 work:
 
-- Decode TMDL/TMSL semantic model definition parts.
-- Extract tables, columns, measures, relationships, hierarchies, and
-  expressions into response schemas.
-- Keep semantic model parsing separate from PBIR report normalization.
-- Add focused tests for TMDL/TMSL parsing and invalid definition parts.
+- Improve TMDL parsing for multiline expressions and more property formats.
+- Add richer unmatched lineage diagnostics.
+- Add evidence fields for matched semantic objects.
 
 ## Current Review Notes
 
-Phase 3.6 and Phase 3.7 are locally verified with Ruff and pytest. The only
+Phase 3.6 through Phase 3.9 are locally verified with Ruff and pytest. The only
 current test-suite warning is a third-party FastAPI/TestClient warning about
 Starlette's `httpx` integration.
 

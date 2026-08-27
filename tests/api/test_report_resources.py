@@ -10,10 +10,16 @@ from app.schemas.report_page import (
     ReportPage,
     ReportPageListResponse,
 )
+from app.schemas.report_semantic_lineage import (
+    ReportSemanticLineageResponse,
+)
 from app.schemas.semantic_model_definition import (
     SemanticModelDefinition,
     SemanticModelDefinitionPart,
     SemanticModelDefinitionResponse,
+)
+from app.services.report_semantic_lineage_service import (
+    ReportSemanticLineageService,
 )
 from app.services.report_service import (
     ReportService,
@@ -305,3 +311,84 @@ def test_semantic_model_definition_rejects_invalid_format(
     )
 
     assert response.status_code == 422
+
+
+def test_get_report_semantic_lineage(
+    client,
+    monkeypatch,
+):
+    expected_semantic_model_workspace_id = (
+        "a2f8996f-8f1a-46e3-8f7c-3f2d2145df45"
+    )
+
+    async def fake_build_lineage(
+        self,
+        *,
+        workspace_id: str,
+        report_id: str,
+        semantic_model_workspace_id: str,
+        semantic_model_id: str,
+        access_token: str,
+        report_definition_format: str | None,
+        semantic_model_definition_format: str,
+    ) -> ReportSemanticLineageResponse:
+        assert workspace_id == WORKSPACE_ID
+        assert report_id == REPORT_ID
+        assert (
+            semantic_model_workspace_id
+            == expected_semantic_model_workspace_id
+        )
+        assert semantic_model_id == SEMANTIC_MODEL_ID
+        assert access_token == "fake-fabric-token"
+        assert report_definition_format == "PBIR"
+        assert (
+            semantic_model_definition_format
+            == "TMDL"
+        )
+
+        return ReportSemanticLineageResponse(
+            workspace_id=workspace_id,
+            report_id=report_id,
+            semantic_model_workspace_id=(
+                semantic_model_workspace_id
+            ),
+            semantic_model_id=semantic_model_id,
+            total_field_reference_count=1,
+            matched_field_reference_count=1,
+            unmatched_field_reference_count=0,
+        )
+
+    monkeypatch.setattr(
+        ReportSemanticLineageService,
+        "build_lineage",
+        fake_build_lineage,
+    )
+
+    response = client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        f"reports/{REPORT_ID}/semantic-lineage"
+        f"?semantic_model_id={SEMANTIC_MODEL_ID}"
+        "&reportFormat=PBIR"
+        "&semanticModelFormat=TMDL"
+        "&semantic_model_workspace_id="
+        f"{expected_semantic_model_workspace_id}"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["workspace_id"] == WORKSPACE_ID
+    assert payload["report_id"] == REPORT_ID
+    assert (
+        payload["semantic_model_workspace_id"]
+        == expected_semantic_model_workspace_id
+    )
+    assert (
+        payload["semantic_model_id"]
+        == SEMANTIC_MODEL_ID
+    )
+    assert (
+        payload["matched_field_reference_count"]
+        == 1
+    )

@@ -29,6 +29,9 @@ from app.schemas.report_page import (
     ReportPage,
     ReportPageListResponse,
 )
+from app.schemas.report_semantic_lineage import (
+    ReportSemanticLineageResponse,
+)
 from app.schemas.semantic_model import (
     SemanticModelListResponse,
 )
@@ -41,6 +44,9 @@ from app.schemas.workspace import (
 )
 from app.services.report_definition_service import (
     ReportDefinitionService,
+)
+from app.services.report_semantic_lineage_service import (
+    ReportSemanticLineageService,
 )
 from app.services.report_service import (
     ReportService,
@@ -400,4 +406,72 @@ async def get_workspace_parsed_semantic_model_definition(
         semantic_model_id=str(semantic_model_id),
         access_token=access_token,
         definition_format=definition_format,
+    )
+
+
+@router.post(
+    (
+        "/{workspace_id}/reports/"
+        "{report_id}/semantic-lineage"
+    ),
+    response_model=ReportSemanticLineageResponse,
+)
+async def get_workspace_report_semantic_lineage(
+    workspace_id: UUID,
+    report_id: UUID,
+    semantic_model_id: Annotated[
+        UUID,
+        Query(),
+    ],
+    access_token: Annotated[
+        str,
+        Depends(
+            get_fabric_access_token
+        ),
+    ],
+    semantic_model_workspace_id: Annotated[
+        UUID | None,
+        Query(),
+    ] = None,
+    report_definition_format: Annotated[
+        str | None,
+        Query(
+            alias="reportFormat",
+            min_length=1,
+            max_length=64,
+        ),
+    ] = "TMDL",
+    semantic_model_definition_format: Annotated[
+        Literal[
+            "TMDL",
+            "TMSL",
+        ],
+        Query(
+            alias="semanticModelFormat",
+        ),
+    ] = "TMDL",
+) -> ReportSemanticLineageResponse:
+    service = ReportSemanticLineageService()
+
+    resolved_semantic_model_workspace_id = (
+        semantic_model_workspace_id
+        or workspace_id
+    )
+
+    return await service.build_lineage(
+        workspace_id=str(workspace_id),
+        report_id=str(report_id),
+        semantic_model_workspace_id=str(
+            resolved_semantic_model_workspace_id
+        ),
+        semantic_model_id=str(
+            semantic_model_id
+        ),
+        access_token=access_token,
+        report_definition_format=(
+            report_definition_format
+        ),
+        semantic_model_definition_format=(
+            semantic_model_definition_format
+        ),
     )
