@@ -1,6 +1,7 @@
 import pytest
 
 from app.api.dependencies.credentials import (
+    get_fabric_access_token,
     get_powerbi_access_token,
 )
 from app.main import app
@@ -9,8 +10,16 @@ from app.schemas.report_page import (
     ReportPage,
     ReportPageListResponse,
 )
+from app.schemas.semantic_model_definition import (
+    SemanticModelDefinition,
+    SemanticModelDefinitionPart,
+    SemanticModelDefinitionResponse,
+)
 from app.services.report_service import (
     ReportService,
+)
+from app.services.semantic_model_definition_service import (
+    SemanticModelDefinitionService,
 )
 
 WORKSPACE_ID = (
@@ -21,20 +30,34 @@ REPORT_ID = (
     "879445d6-3a9e-4a74-b5ae-7c0ddabf0f11"
 )
 
+SEMANTIC_MODEL_ID = (
+    "cfafbeb1-8037-4d0c-896e-a46fb27ff229"
+)
+
 
 @pytest.fixture(autouse=True)
 def override_authentication():
     async def fake_powerbi_token() -> str:
         return "fake-test-token"
 
+    async def fake_fabric_token() -> str:
+        return "fake-fabric-token"
+
     app.dependency_overrides[
         get_powerbi_access_token
     ] = fake_powerbi_token
+    app.dependency_overrides[
+        get_fabric_access_token
+    ] = fake_fabric_token
 
     yield
 
     app.dependency_overrides.pop(
         get_powerbi_access_token,
+        None,
+    )
+    app.dependency_overrides.pop(
+        get_fabric_access_token,
         None,
     )
 
@@ -190,6 +213,95 @@ def test_invalid_report_uuid(
             f"{WORKSPACE_ID}/reports/"
             f"invalid-report-id"
         
+    )
+
+    assert response.status_code == 422
+
+
+def test_get_semantic_model_definition(
+    client,
+    monkeypatch,
+):
+    async def fake_get_definition(
+        self,
+        *,
+        workspace_id: str,
+        semantic_model_id: str,
+        access_token: str,
+        definition_format: str,
+    ) -> SemanticModelDefinitionResponse:
+        assert workspace_id == WORKSPACE_ID
+        assert semantic_model_id == SEMANTIC_MODEL_ID
+        assert access_token == "fake-fabric-token"
+        assert definition_format == "TMSL"
+
+        return SemanticModelDefinitionResponse(
+            workspace_id=workspace_id,
+            semantic_model_id=semantic_model_id,
+            definition=SemanticModelDefinition(
+                format=definition_format,
+                parts=[
+                    SemanticModelDefinitionPart(
+                        path=(
+                            "definition/model.tmdl"
+                        ),
+                        payload=(
+                            "bW9kZWwgTW9kZWw="
+                        ),
+                        payload_type=(
+                            "InlineBase64"
+                        ),
+                    )
+                ],
+            ),
+        )
+
+    monkeypatch.setattr(
+        SemanticModelDefinitionService,
+        "get_definition",
+        fake_get_definition,
+    )
+
+    response = client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        "semantic-models/"
+        f"{SEMANTIC_MODEL_ID}/definition"
+        "?format=TMSL"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["workspace_id"] == WORKSPACE_ID
+    assert (
+        payload["semantic_model_id"]
+        == SEMANTIC_MODEL_ID
+    )
+    assert (
+        payload["definition"]["format"]
+        == "TMSL"
+    )
+    assert (
+        payload["definition"]["parts"][0][
+            "payloadType"
+        ]
+        == "InlineBase64"
+    )
+    assert (
+        "payload_type"
+        not in payload["definition"]["parts"][0]
+    )
+
+
+def test_semantic_model_definition_rejects_invalid_format(
+    client,
+):
+    response = client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        "semantic-models/"
+        f"{SEMANTIC_MODEL_ID}/definition"
+        "?format=PBIR"
     )
 
     assert response.status_code == 422

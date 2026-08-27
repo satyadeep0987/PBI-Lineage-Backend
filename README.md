@@ -27,9 +27,8 @@ Current capabilities:
   semantic model references from PBIR.
 - Extracts visual field references for columns, measures, hierarchies, sorts,
   filters, and projections.
-- Retrieves Fabric semantic model definitions in TMDL/TMSL format in current
-  in-progress work.
-- Exposes provider authentication/scope diagnostics in current in-progress work.
+- Retrieves Fabric semantic model definitions in TMDL/TMSL format.
+- Exposes provider authentication/scope diagnostics.
 
 Future capabilities:
 
@@ -363,46 +362,34 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 26, 2026 | Phase 3.3 | Completed | Added Fabric report definition retrieval. |
 | Aug 26, 2026 | Phase 3.4 | Completed | Added report definition decoding and normalization. |
 | Aug 26, 2026 | Phase 3.5 | Completed | Added visual semantic query and field reference extraction. |
+| Aug 28, 2026 | Phase 3.6 | Completed locally | Stabilized auth diagnostics and Fabric scope handling. |
+| Aug 28, 2026 | Phase 3.7 | Completed locally | Finalized semantic model definition retrieval coverage. |
 
 ### Latest Completed Phase
 
-Phase 3.5 is the latest completed committed phase. It added extraction of
-visual semantic query and field references from PBIR report definitions,
-including projections, sorts, filters, columns, measures, aggregations,
-hierarchies, and hierarchy levels.
+Phase 3.7 is the latest completed local phase. It finalized semantic model
+definition retrieval by covering immediate Fabric responses, long-running
+operation responses, failed operation statuses, invalid payload handling, Fabric
+client URL/query construction, API route wiring, and `payloadType` response
+serialization.
 
-### Current In-Progress Phase
+### Next Phase
 
-Phase 3.6 - Auth Diagnostics + Fabric Scope Stabilization is the current
-in-progress phase.
+Phase 3.8 - Parse Semantic Model Definition is the next phase.
 
-Remaining Phase 3.6 work:
+Recommended Phase 3.8 work:
 
-- Stabilize Fabric authentication diagnostics.
-- Ensure both device auth status APIs return the same scope detail structure.
-- Preserve Power BI authentication even when Fabric authentication is not
-  available.
-- Show requested scopes, granted scopes, missing scopes, provider connection
-  status, and provider error code.
-- Add service-level tests for Power BI validation failure and Fabric silent auth
-  success/failure paths.
-- Pass targeted auth tests and Ruff before moving to the next phase.
+- Decode TMDL/TMSL semantic model definition parts.
+- Extract tables, columns, measures, relationships, hierarchies, and
+  expressions into response schemas.
+- Keep semantic model parsing separate from PBIR report normalization.
+- Add focused tests for TMDL/TMSL parsing and invalid definition parts.
 
 ## Current Review Notes
 
-Before running the full suite or committing current auth diagnostics work,
-review these implementation details:
-
-- `device_auth_store.delete_device_session()` must keep an early return when the
-  session is missing.
-- Both auth status routes should share the same response helper for pending,
-  failed, and authenticated states.
-- Fabric should not be marked connected until Fabric validation succeeds.
-- Silent Fabric success should store granted Fabric scopes.
-- Fabric failure paths should clear granted Fabric scopes and preserve the
-  useful error code.
-- Auth tests should pass granted scopes into created sessions, not only declare
-  default function parameters.
+Phase 3.6 and Phase 3.7 are locally verified with Ruff and pytest. The only
+current test-suite warning is a third-party FastAPI/TestClient warning about
+Starlette's `httpx` integration.
 
 ## Development Notes
 

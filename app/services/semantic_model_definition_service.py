@@ -12,10 +12,16 @@ from app.core.exceptions import (
     UpstreamRequestError,
     UpstreamTimeoutError,
 )
+from app.schemas.parsed_semantic_model import (
+    ParsedSemanticModelResponse,
+)
 from app.schemas.semantic_model_definition import (
     SemanticModelDefinition,
     SemanticModelDefinitionPart,
     SemanticModelDefinitionResponse,
+)
+from app.services.semantic_model_definition_parser import (
+    SemanticModelDefinitionParser,
 )
 
 
@@ -347,6 +353,25 @@ class SemanticModelDefinitionService:
             )
 
         return retry_after
+
+    async def get_parsed_definition(
+        self,
+        *,
+        workspace_id: str,
+        semantic_model_id: str,
+        access_token: str,
+        definition_format: str = "TMDL",
+    ) -> ParsedSemanticModelResponse:
+        raw_definition = await self.get_definition(
+            workspace_id=workspace_id,
+            semantic_model_id=semantic_model_id,
+            access_token=access_token,
+            definition_format=definition_format,
+        )
+
+        parser = SemanticModelDefinitionParser()
+
+        return parser.parse(raw_definition)
 
     async def get_definition(
         self,

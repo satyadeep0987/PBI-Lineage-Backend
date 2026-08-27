@@ -15,6 +15,9 @@ from app.api.dependencies.credentials import (
 from app.schemas.normalized_report_definition import (
     NormalizedReportDefinitionResponse,
 )
+from app.schemas.parsed_semantic_model import (
+    ParsedSemanticModelResponse,
+)
 from app.schemas.report import (
     Report,
     ReportListResponse,
@@ -362,4 +365,39 @@ async def get_workspace_semantic_model_definition(
         definition_format=(
             definition_format
         ),
+    )
+
+@router.post(
+    (
+        "/{workspace_id}/semantic-models/"
+        "{semantic_model_id}/definition/parsed"
+    ),
+    response_model=ParsedSemanticModelResponse,
+)
+async def get_workspace_parsed_semantic_model_definition(
+    workspace_id: UUID,
+    semantic_model_id: UUID,
+    access_token: Annotated[
+        str,
+        Depends(
+            get_fabric_access_token
+        ),
+    ],
+    definition_format: Annotated[
+        Literal[
+            "TMDL",
+            "TMSL",
+        ],
+        Query(
+            alias="format",
+        ),
+    ] = "TMDL",
+) -> ParsedSemanticModelResponse:
+    service = SemanticModelDefinitionService()
+
+    return await service.get_parsed_definition(
+        workspace_id=str(workspace_id),
+        semantic_model_id=str(semantic_model_id),
+        access_token=access_token,
+        definition_format=definition_format,
     )
