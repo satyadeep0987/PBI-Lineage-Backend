@@ -38,6 +38,9 @@ from app.schemas.semantic_model import (
 from app.schemas.semantic_model_definition import (
     SemanticModelDefinitionResponse,
 )
+from app.schemas.semantic_model_metadata import (
+    SemanticModelMetadataResponse,
+)
 from app.schemas.workspace import (
     Workspace,
     WorkspaceListResponse,
@@ -56,6 +59,9 @@ from app.services.report_service import (
 )
 from app.services.semantic_model_definition_service import (
     SemanticModelDefinitionService,
+)
+from app.services.semantic_model_metadata_service import (
+    SemanticModelMetadataService,
 )
 from app.services.semantic_model_service import (
     SemanticModelService,
@@ -458,6 +464,64 @@ async def get_workspace_semantic_model_xmla_metadata(
         access_token=access_token,
         workspace_name=workspace_name,
         database_name=database_name,
+    )
+
+
+@router.get(
+    (
+        "/{workspace_id}/semantic-models/"
+        "{semantic_model_id}/metadata"
+    ),
+    response_model=SemanticModelMetadataResponse,
+)
+async def get_workspace_semantic_model_metadata(
+    workspace_id: UUID,
+    semantic_model_id: UUID,
+    fabric_access_token: Annotated[
+        str,
+        Depends(
+            get_fabric_access_token
+        ),
+    ],
+    powerbi_access_token: Annotated[
+        str,
+        Depends(
+            get_powerbi_access_token
+        ),
+    ],
+    workspace_name: Annotated[
+        str | None,
+        Query(
+            alias="workspaceName",
+            min_length=1,
+            max_length=256,
+        ),
+    ] = None,
+    database_name: Annotated[
+        str | None,
+        Query(
+            alias="databaseName",
+            min_length=1,
+            max_length=256,
+        ),
+    ] = None,
+    definition_format: Annotated[
+        Literal["TMDL"],
+        Query(
+            alias="format",
+        ),
+    ] = "TMDL",
+) -> SemanticModelMetadataResponse:
+    service = SemanticModelMetadataService()
+
+    return await service.get_metadata(
+        workspace_id=str(workspace_id),
+        semantic_model_id=str(semantic_model_id),
+        fabric_access_token=fabric_access_token,
+        powerbi_access_token=powerbi_access_token,
+        workspace_name=workspace_name,
+        database_name=database_name,
+        definition_format=definition_format,
     )
 
 

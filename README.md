@@ -33,6 +33,8 @@ Current capabilities:
 - Carries semantic model source-path evidence into lineage matches.
 - Extracts XMLA semantic model metadata through an ADODB COM/MSOLAP adapter
   when the host has the Analysis Services OLE DB provider configured.
+- Combines parsed Fabric TMDL and XMLA metadata into a source-preserving
+  semantic metadata response with object reconciliation evidence.
 - Adds lineage diagnostics with match confidence, candidate suggestions, and
   summary counts by status and object type.
 - Exposes provider authentication/scope diagnostics.
@@ -43,7 +45,7 @@ Current capabilities:
 Future capabilities:
 
 - Improve semantic model parser coverage for more TMDL shapes.
-- Validate XMLA extraction against live Power BI/Fabric capacities.
+- Run live XMLA acceptance validation against a Power BI/Fabric capacity.
 - Add Snowflake lineage.
 - Add impact analysis APIs.
 - Add production-grade auth/session storage.
@@ -175,6 +177,7 @@ POST /api/v1/workspaces/{workspace_id}/reports/{report_id}/definition
 POST /api/v1/workspaces/{workspace_id}/reports/{report_id}/definition/normalized
 POST /api/v1/workspaces/{workspace_id}/semantic-models/{semantic_model_id}/definition
 POST /api/v1/workspaces/{workspace_id}/semantic-models/{semantic_model_id}/definition/parsed
+GET /api/v1/workspaces/{workspace_id}/semantic-models/{semantic_model_id}/metadata
 POST /api/v1/workspaces/{workspace_id}/reports/{report_id}/semantic-lineage
 ```
 
@@ -222,6 +225,22 @@ If `pywin32`, Windows COM, or the Microsoft Analysis Services OLE DB Provider
 is not available on the host, the client returns
 `PROVIDER_INTEGRATION_NOT_CONFIGURED` with a setup message.
 
+### Merged Semantic Model Metadata
+
+```text
+GET /api/v1/workspaces/{workspace_id}/semantic-models/{semantic_model_id}/metadata
+```
+
+This endpoint requires both Fabric authentication for the TMDL definition and
+Power BI authentication for XMLA. It accepts `workspaceName` and `databaseName`
+for XMLA name resolution; `format` is intentionally restricted to `TMDL`.
+
+The response preserves both source payloads instead of overwriting one with the
+other. Its `reconciliation.matches` list matches tables, columns, measures,
+hierarchies, hierarchy levels, partitions, and relationships by normalized
+identity and reports `matched`, `definition_only`, or `xmla_only`. TMDL source
+paths remain the definition evidence; XMLA provides runtime metadata.
+
 ## Folder Structure
 
 ```text
@@ -264,8 +283,8 @@ FastAPI routing layer.
   - In-progress scope diagnostics for Power BI and Fabric status.
 - `app/api/v1/workspaces.py`
   - Workspace, report, page, semantic model, report definition, normalized
-    report definition, semantic model definition, semantic lineage, and XMLA
-    metadata endpoints.
+    report definition, semantic model definition, semantic metadata,
+    semantic lineage, and XMLA metadata endpoints.
 - `app/api/dependencies/credentials.py`
   - FastAPI dependencies for extracting Power BI and Fabric access tokens from
     the auth session cookie.
@@ -351,6 +370,8 @@ Pydantic API contracts.
 - `xmla_metadata.py`
   - API shape for XMLA semantic model metadata, including tables, columns,
     measures, partitions, hierarchies, relationships, counts, and warnings.
+- `semantic_model_metadata.py`
+  - Combined Fabric TMDL/XMLA metadata response and reconciliation evidence.
 - `auth.py`
   - Microsoft auth requests, device flow responses, provider connection status,
     and scope diagnostics.
@@ -387,6 +408,9 @@ Business logic layer. Routes call services; services call clients.
 - `xmla_metadata_service.py`
   - Maps XMLA adapter output into the XMLA metadata response contract and
     validates adapter payload shape.
+- `semantic_model_metadata_service.py`
+  - Retrieves parsed TMDL and XMLA metadata concurrently, validates source
+    identity, and reconciles source-preserving object evidence.
 - `report_definition_decoder.py`
   - Decodes structural JSON definition parts from base64 payloads.
 - `report_definition_normalizer.py`
@@ -441,6 +465,8 @@ Automated tests.
     mapping, adapter setup failures, and access-token redaction.
 - `tests/unit/test_xmla_metadata_service.py`
   - XMLA metadata contract mapping and validation.
+- `tests/unit/test_semantic_model_metadata_service.py`
+  - Combined semantic metadata reconciliation and source identity validation.
 - `tests/unit/test_report_definition_decoder.py`
   - Base64/JSON definition decoding.
 - `tests/unit/test_report_definition_normalizer.py`
@@ -479,34 +505,37 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.12.1 | Completed locally | Corrected Fabric report definition formats to default to PBIR and reject semantic-model-only formats. |
 | Aug 28, 2026 | Phase 3.12.2 | Completed locally | Added upstream provider diagnostic detail for Fabric request and operation failures. |
 | Aug 28, 2026 | Phase 3.13 | Completed locally | Implemented the XMLA ADODB/MSOLAP adapter path and TMSCHEMA metadata extraction mapping. |
+| Aug 28, 2026 | Phase 3.14 | Completed locally | Added source-preserving Fabric TMDL/XMLA semantic metadata reconciliation. |
+
+The Phase 3.6-3.14 execution labels are retained for history. Against the
+original roadmap, they finish Phase 3 report-level lineage and implement Phase
+4 semantic model metadata. The next numbered roadmap work is Phase 5.1.
 
 ### Latest Completed Phase
 
-Phase 3.13 is the latest completed local phase. It implements the XMLA
-ADODB/MSOLAP adapter path behind `XmlaClient`, builds encoded Power BI XMLA
-workspace endpoints, passes the Power BI access token through the OLE DB
-connection string, queries TMSCHEMA rowsets, maps raw XMLA metadata into the
-existing metadata contract, and redacts access tokens from XMLA failure
-details. The metadata service resolves the workspace name and semantic model
-name from Power BI REST when callers provide only route IDs.
+Phase 3.14 is the latest completed local phase. It adds a combined semantic
+metadata endpoint that retrieves parsed Fabric TMDL and XMLA metadata using
+their respective tokens, preserves both source payloads, validates route/source
+identity, and reconciles semantic objects without silently choosing a winner.
+TMDL remains the source-path authority; XMLA contributes live runtime metadata.
 
 ### Next Phase
 
-Phase 3.14 - Live XMLA validation and semantic metadata merge is the next
-phase.
+Original Phase 5.1 - Measure DAX Parsing is the next implementation phase.
 
-Recommended Phase 3.14 work:
+The Phase 3.14 implementation has a tenant-dependent acceptance check that is
+not part of local automated testing:
 
 - Validate XMLA extraction against a Premium, PPU, or Fabric capacity with XMLA
   enabled.
 - Confirm workspace naming, tenant naming, and semantic model `Initial Catalog`
   behavior with real workspaces.
-- Decide how XMLA metadata should merge with Fabric TMDL parsing in lineage
-  responses.
+- Confirm the merged metadata endpoint returns expected source counts and
+  reconciliation statuses for a real semantic model.
 
 ## Current Review Notes
 
-Phase 3.6 through Phase 3.13 are locally verified with Ruff and pytest. The
+Phase 3.6 through Phase 3.14 are locally verified with Ruff and pytest. The
 only current test-suite warning is a third-party FastAPI/TestClient warning
 about Starlette's `httpx` integration.
 

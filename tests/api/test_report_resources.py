@@ -5,6 +5,9 @@ from app.api.dependencies.credentials import (
     get_powerbi_access_token,
 )
 from app.main import app
+from app.schemas.parsed_semantic_model import (
+    ParsedSemanticModelResponse,
+)
 from app.schemas.report import Report
 from app.schemas.report_definition import (
     ReportDefinition,
@@ -24,6 +27,10 @@ from app.schemas.semantic_model_definition import (
     SemanticModelDefinitionPart,
     SemanticModelDefinitionResponse,
 )
+from app.schemas.semantic_model_metadata import (
+    SemanticModelMetadataReconciliation,
+    SemanticModelMetadataResponse,
+)
 from app.schemas.xmla_metadata import (
     XmlaSemanticModelMetadataResponse,
     XmlaSemanticModelTable,
@@ -39,6 +46,9 @@ from app.services.report_service import (
 )
 from app.services.semantic_model_definition_service import (
     SemanticModelDefinitionService,
+)
+from app.services.semantic_model_metadata_service import (
+    SemanticModelMetadataService,
 )
 from app.services.xmla_metadata_service import (
     XmlaMetadataService,
@@ -483,6 +493,102 @@ def test_get_semantic_model_xmla_metadata(
         payload["tables"][0]["name"]
         == "Sales"
     )
+
+
+def test_get_semantic_model_metadata(
+    client,
+    monkeypatch,
+):
+    async def fake_get_metadata(
+        self,
+        *,
+        workspace_id: str,
+        semantic_model_id: str,
+        fabric_access_token: str,
+        powerbi_access_token: str,
+        workspace_name: str | None,
+        database_name: str | None,
+        definition_format: str,
+    ) -> SemanticModelMetadataResponse:
+        assert workspace_id == WORKSPACE_ID
+        assert semantic_model_id == SEMANTIC_MODEL_ID
+        assert fabric_access_token == "fake-fabric-token"
+        assert powerbi_access_token == "fake-test-token"
+        assert workspace_name == "Sales Workspace"
+        assert database_name == "Sales Model"
+        assert definition_format == "TMDL"
+
+        return SemanticModelMetadataResponse(
+            workspace_id=workspace_id,
+            semantic_model_id=semantic_model_id,
+            definition=ParsedSemanticModelResponse(
+                workspace_id=workspace_id,
+                semantic_model_id=semantic_model_id,
+                format="TMDL",
+            ),
+            xmla=XmlaSemanticModelMetadataResponse(
+                workspace_id=workspace_id,
+                semantic_model_id=semantic_model_id,
+                xmla_endpoint=(
+                    "powerbi://api.powerbi.com/v1.0/"
+                    "myorg/Sales%20Workspace"
+                ),
+                table_count=0,
+                column_count=0,
+                measure_count=0,
+                relationship_count=0,
+                hierarchy_count=0,
+                partition_count=0,
+            ),
+            reconciliation=(
+                SemanticModelMetadataReconciliation(
+                    matched_count=0,
+                    definition_only_count=0,
+                    xmla_only_count=0,
+                )
+            ),
+        )
+
+    monkeypatch.setattr(
+        SemanticModelMetadataService,
+        "get_metadata",
+        fake_get_metadata,
+    )
+
+    response = client.get(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        "semantic-models/"
+        f"{SEMANTIC_MODEL_ID}/metadata"
+        "?workspaceName=Sales%20Workspace"
+        "&databaseName=Sales%20Model"
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert payload["workspace_id"] == WORKSPACE_ID
+    assert payload["semantic_model_id"] == SEMANTIC_MODEL_ID
+    assert payload["definition"]["format"] == "TMDL"
+    assert payload["xmla"]["source"] == "xmla"
+    assert payload["reconciliation"] == {
+        "matched_count": 0,
+        "definition_only_count": 0,
+        "xmla_only_count": 0,
+        "matches": [],
+    }
+
+
+def test_semantic_model_metadata_rejects_non_tmdl_format(
+    client,
+):
+    response = client.get(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/"
+        "semantic-models/"
+        f"{SEMANTIC_MODEL_ID}/metadata?format=TMSL"
+    )
+
+    assert response.status_code == 422
 
 
 def test_get_report_semantic_lineage(
