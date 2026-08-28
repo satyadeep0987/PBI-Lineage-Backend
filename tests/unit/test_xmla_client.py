@@ -1,3 +1,5 @@
+import sys
+import types
 from typing import Any, Self
 
 import pytest
@@ -10,6 +12,7 @@ from app.clients.xmla_client import (
     TMSCHEMA_PARTITIONS_QUERY,
     TMSCHEMA_RELATIONSHIPS_QUERY,
     TMSCHEMA_TABLES_QUERY,
+    AdoComXmlaConnection,
     XmlaClient,
 )
 from app.core.exceptions import (
@@ -85,7 +88,7 @@ class _MissingConnectionFactory:
         raise ProviderIntegrationNotConfiguredError(
             "xmla",
             detail=(
-                "Install pythonnet and ADOMD."
+                "Install pywin32 and MSOLAP."
             ),
         )
 
@@ -93,9 +96,9 @@ class _MissingConnectionFactory:
 class _FailingConnection:
     def __init__(
         self,
-        token: str,
+        connection_string: str,
     ) -> None:
-        self.token = token
+        self.connection_string = connection_string
 
     def __enter__(self) -> Self:
         return self
@@ -113,7 +116,8 @@ class _FailingConnection:
         query: str,
     ) -> list[dict[str, Any]]:
         raise RuntimeError(
-            f"XMLA failed for {self.token}"
+            "XMLA failed for "
+            f"{self.connection_string}"
         )
 
 
@@ -121,12 +125,25 @@ class _FailingConnectionFactory:
     def __call__(
         self,
         *,
-        access_token: str,
-        **kwargs,
+        connection_string: str,
     ) -> _FailingConnection:
         return _FailingConnection(
-            access_token
+            connection_string
         )
+
+
+class _MissingProviderComConnection:
+    def Open(
+        self,
+        connection_string: str,
+    ) -> None:
+        raise RuntimeError(
+            "Provider cannot be found. It may "
+            "not be properly installed."
+        )
+
+    def Close(self) -> None:
+        return None
 
 
 def _rowsets() -> dict[
@@ -267,30 +284,33 @@ def test_build_workspace_endpoint_falls_back_to_workspace_id():
 
 def test_build_connection_string_uses_initial_catalog():
     connection_string = XmlaClient(
-        tenant_name="contoso.com"
+        tenant_name="contoso.com",
+        provider_name="MSOLAP.8",
     ).build_connection_string(
         workspace_id="workspace-123",
         semantic_model_id="model-123",
         workspace_name="Sales Workspace",
         database_name="Sales Model",
+        access_token="token",
     )
 
     assert connection_string == (
+        "Provider=MSOLAP.8;"
         "Data Source=powerbi://api.powerbi.com/"
         "v1.0/contoso.com/Sales%20Workspace;"
         "Initial Catalog=Sales Model;"
+        "Password=token;"
     )
 
 
 @pytest.mark.asyncio
-async def test_xmla_metadata_reads_adomd_rowsets():
+async def test_xmla_metadata_reads_adodb_rowsets():
     factory = _FakeConnectionFactory(
         _rowsets()
     )
     client = XmlaClient(
         connection_factory=factory,
         tenant_name="myorg",
-        token_expires_in_minutes=45,
     )
 
     metadata = (
@@ -306,14 +326,12 @@ async def test_xmla_metadata_reads_adomd_rowsets():
     assert factory.calls == [
         {
             "connection_string": (
+                "Provider=MSOLAP;"
                 "Data Source=powerbi://"
                 "api.powerbi.com/v1.0/myorg/"
                 "Sales%20Workspace;Initial Catalog="
-                "Sales Model;"
+                "Sales Model;Password=token;"
             ),
-            "access_token": "token",
-            "adomd_dll_path": None,
-            "token_expires_in_minutes": 45,
         }
     ]
     assert factory.connections[0].executed_queries == [
@@ -409,9 +427,65 @@ async def test_xmla_metadata_boundary_reports_missing_adapter():
         "PROVIDER_INTEGRATION_NOT_CONFIGURED"
     )
     assert (
-        "Install pythonnet"
+        "Install pywin32"
         in exc_info.value.message
     )
+
+
+def test_adocom_connection_reports_missing_msolap_provider(
+    monkeypatch,
+):
+    fake_pythoncom = types.ModuleType(
+        "pythoncom"
+    )
+    fake_pythoncom.CoInitialize = (
+        lambda: None
+    )
+    fake_pythoncom.CoUninitialize = (
+        lambda: None
+    )
+
+    fake_win32com = types.ModuleType(
+        "win32com"
+    )
+    fake_win32com_client = types.ModuleType(
+        "win32com.client"
+    )
+    fake_win32com_client.Dispatch = (
+        lambda name: _MissingProviderComConnection()
+    )
+    fake_win32com.client = (
+        fake_win32com_client
+    )
+
+    monkeypatch.setitem(
+        sys.modules,
+        "pythoncom",
+        fake_pythoncom,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "win32com",
+        fake_win32com,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "win32com.client",
+        fake_win32com_client,
+    )
+
+    with pytest.raises(
+        ProviderIntegrationNotConfiguredError
+    ) as exc_info, AdoComXmlaConnection(
+        connection_string="Provider=MSOLAP;"
+    ):
+        pass
+
+    assert exc_info.value.provider == "xmla"
+    assert exc_info.value.code == (
+        "PROVIDER_INTEGRATION_NOT_CONFIGURED"
+    )
+    assert "MSOLAP" in exc_info.value.message
 
 
 @pytest.mark.asyncio

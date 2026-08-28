@@ -1,5 +1,7 @@
 import asyncio
+import platform
 from collections.abc import Mapping
+from contextlib import suppress
 from types import TracebackType
 from typing import Any, Protocol, Self
 from urllib.parse import quote
@@ -58,58 +60,82 @@ class XmlaConnectionFactory(Protocol):
         self,
         *,
         connection_string: str,
-        access_token: str,
-        adomd_dll_path: str | None,
-        token_expires_in_minutes: int,
     ) -> XmlaMetadataConnection:
         ...
 
 
-class AdomdXmlaConnection:
+class AdoComXmlaConnection:
     def __init__(
         self,
         *,
         connection_string: str,
-        access_token: str,
-        adomd_dll_path: str | None,
-        token_expires_in_minutes: int,
     ) -> None:
         self.connection_string = (
             connection_string
         )
-        self.access_token = access_token
-        self.adomd_dll_path = (
-            adomd_dll_path
-        )
-        self.token_expires_in_minutes = (
-            token_expires_in_minutes
-        )
         self._connection: Any = None
+        self._pythoncom: Any = None
+        self._com_initialized = False
 
     def __enter__(self) -> Self:
-        (
-            adomd_connection_type,
-            access_token_type,
-            date_time_offset_type,
-        ) = self._load_adomd_types()
+        try:
+            import pythoncom  # type: ignore[import-not-found]
+            import win32com.client  # type: ignore[import-not-found]
 
-        self._connection = adomd_connection_type(
-            self.connection_string
-        )
-        self._connection.AccessToken = (
-            access_token_type(
-                self.access_token,
-                (
-                    date_time_offset_type
-                    .UtcNow
-                    .AddMinutes(
-                        self.token_expires_in_minutes
-                    )
-                ),
-                None,
+        except ImportError as exc:
+            detail = (
+                "XMLA ADODB transport requires "
+                "Windows, pywin32, and the "
+                "Microsoft Analysis Services "
+                "OLE DB Provider (MSOLAP)."
             )
-        )
-        self._connection.Open()
+
+            if platform.system() != "Windows":
+                detail = (
+                    f"{detail} This host is not "
+                    "Windows."
+                )
+
+            raise ProviderIntegrationNotConfiguredError(
+                "xmla",
+                detail=detail,
+            ) from exc
+
+        self._pythoncom = pythoncom
+
+        try:
+            pythoncom.CoInitialize()
+            self._com_initialized = True
+            self._connection = (
+                win32com.client.Dispatch(
+                    "ADODB.Connection"
+                )
+            )
+            self._connection.Open(
+                self.connection_string
+            )
+
+        except Exception as exc:
+            self.__exit__(None, None, None)
+
+            if _is_provider_configuration_error(
+                exc
+            ):
+                raise ProviderIntegrationNotConfiguredError(
+                    "xmla",
+                    detail=(
+                        "XMLA ADODB transport is not "
+                        "configured. Install pywin32 "
+                        "and the Microsoft Analysis "
+                        "Services OLE DB Provider "
+                        "(MSOLAP), then set "
+                        "XMLA_PROVIDER if a "
+                        "version-specific provider is "
+                        "required."
+                    ),
+                ) from exc
+
+            raise
 
         return self
 
@@ -119,28 +145,27 @@ class AdomdXmlaConnection:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        if self._connection is None:
-            return
+        if self._connection is not None:
+            close = getattr(
+                self._connection,
+                "Close",
+                None,
+            )
 
-        close = getattr(
-            self._connection,
-            "Close",
-            None,
-        )
+            if callable(close):
+                with suppress(Exception):
+                    close()
 
-        if callable(close):
-            close()
-
-        dispose = getattr(
-            self._connection,
-            "Dispose",
-            None,
-        )
-
-        if callable(dispose):
-            dispose()
+        if (
+            self._com_initialized
+            and self._pythoncom is not None
+        ):
+            with suppress(Exception):
+                self._pythoncom.CoUninitialize()
 
         self._connection = None
+        self._pythoncom = None
+        self._com_initialized = False
 
     def execute(
         self,
@@ -154,115 +179,60 @@ class AdomdXmlaConnection:
                 ),
             )
 
-        command = (
-            self._connection
-            .CreateCommand()
+        result = self._connection.Execute(
+            query
         )
-        command.CommandText = query
 
-        reader = command.ExecuteReader()
+        recordset = (
+            result[0]
+            if isinstance(result, tuple)
+            else result
+        )
+
+        if recordset is None:
+            return []
 
         try:
-            columns = [
-                reader.GetName(index)
-                for index in range(
-                    reader.FieldCount
-                )
-            ]
-            rows: list[dict[str, Any]] = []
-
-            while reader.Read():
-                rows.append(
-                    {
-                        column: (
-                            _normalize_adomd_value(
-                                reader.GetValue(
-                                    index
-                                )
-                            )
-                        )
-                        for index, column
-                        in enumerate(columns)
-                    }
-                )
-
-            return rows
+            return _recordset_to_rows(
+                recordset
+            )
 
         finally:
-            close_reader = getattr(
-                reader,
+            close_recordset = getattr(
+                recordset,
                 "Close",
                 None,
             )
 
-            if callable(close_reader):
-                close_reader()
+            if callable(close_recordset):
+                with suppress(Exception):
+                    close_recordset()
 
-            dispose_command = getattr(
-                command,
-                "Dispose",
-                None,
-            )
 
-            if callable(dispose_command):
-                dispose_command()
+def _recordset_to_rows(
+    recordset: Any,
+) -> list[dict[str, Any]]:
+    fields = recordset.Fields
+    field_count = int(fields.Count)
+    columns = [
+        str(fields.Item(index).Name)
+        for index in range(field_count)
+    ]
+    rows: list[dict[str, Any]] = []
 
-    def _load_adomd_types(
-        self,
-    ) -> tuple[Any, Any, Any]:
-        try:
-            import clr  # type: ignore[import-not-found]
-
-        except ImportError as exc:
-            raise ProviderIntegrationNotConfiguredError(
-                "xmla",
-                detail=(
-                    "Install pythonnet and the "
-                    "Microsoft Analysis Services "
-                    "ADOMD client library, then set "
-                    "XMLA_ADOMD_DLL_PATH if the "
-                    "assembly is not discoverable."
-                ),
-            ) from exc
-
-        try:
-            if self.adomd_dll_path:
-                clr.AddReference(
-                    self.adomd_dll_path
+    while not bool(recordset.EOF):
+        rows.append(
+            {
+                column: _normalize_ado_value(
+                    fields.Item(index).Value
                 )
-
-            else:
-                clr.AddReference(
-                    "Microsoft.AnalysisServices."
-                    "AdomdClient"
-                )
-
-            from Microsoft.AnalysisServices.AdomdClient import (  # type: ignore[import-not-found]
-                AccessToken,
-                AdomdConnection,
-            )
-            from System import (  # type: ignore[import-not-found]
-                DateTimeOffset,
-            )
-
-        except Exception as exc:
-            raise ProviderIntegrationNotConfiguredError(
-                "xmla",
-                detail=(
-                    "The Microsoft Analysis Services "
-                    "ADOMD client assembly could not "
-                    "be loaded. Set XMLA_ADOMD_DLL_PATH "
-                    "to the installed "
-                    "Microsoft.AnalysisServices."
-                    "AdomdClient.dll path."
-                ),
-            ) from exc
-
-        return (
-            AdomdConnection,
-            AccessToken,
-            DateTimeOffset,
+                for index, column
+                in enumerate(columns)
+            }
         )
+        recordset.MoveNext()
+
+    return rows
 
 
 class XmlaClient:
@@ -277,27 +247,22 @@ class XmlaClient:
             XmlaConnectionFactory | None
         ) = None,
         tenant_name: str | None = None,
-        adomd_dll_path: str | None = None,
-        token_expires_in_minutes: int | None = None,
+        provider_name: str | None = None,
     ) -> None:
         settings = get_settings()
 
         self.connection_factory = (
             connection_factory
-            or AdomdXmlaConnection
+            or AdoComXmlaConnection
         )
         self.tenant_name = (
             tenant_name
             or settings.xmla_tenant_name
         )
-        self.adomd_dll_path = (
-            adomd_dll_path
-            if adomd_dll_path is not None
-            else settings.xmla_adomd_dll_path
-        )
-        self.token_expires_in_minutes = (
-            token_expires_in_minutes
-            or settings.xmla_access_token_minutes
+        self.provider_name = (
+            provider_name
+            or settings.xmla_provider
+            or "MSOLAP"
         )
 
     def build_workspace_endpoint(
@@ -328,6 +293,7 @@ class XmlaClient:
         semantic_model_id: str,
         workspace_name: str | None = None,
         database_name: str | None = None,
+        access_token: str | None = None,
     ) -> str:
         initial_catalog = (
             database_name or semantic_model_id
@@ -336,15 +302,35 @@ class XmlaClient:
             workspace_id=workspace_id,
             workspace_name=workspace_name,
         )
-        catalog = _connection_string_value(
-            initial_catalog
-        )
+        parts = [
+            (
+                "Provider",
+                self.provider_name,
+            ),
+            (
+                "Data Source",
+                endpoint,
+            ),
+            (
+                "Initial Catalog",
+                initial_catalog,
+            ),
+        ]
 
-        return (
-            "Data Source="
-            f"{endpoint};"
-            "Initial Catalog="
-            f"{catalog};"
+        if access_token:
+            parts.append(
+                (
+                    "Password",
+                    access_token,
+                )
+            )
+
+        return "".join(
+            (
+                f"{key}="
+                f"{_connection_string_value(value)};"
+            )
+            for key, value in parts
         )
 
     async def get_semantic_model_metadata(
@@ -397,6 +383,7 @@ class XmlaClient:
                 ),
                 workspace_name=workspace_name,
                 database_name=database_name,
+                access_token=access_token,
             )
         )
 
@@ -407,13 +394,6 @@ class XmlaClient:
 
         with self.connection_factory(
             connection_string=connection_string,
-            access_token=access_token,
-            adomd_dll_path=(
-                self.adomd_dll_path
-            ),
-            token_expires_in_minutes=(
-                self.token_expires_in_minutes
-            ),
         ) as connection:
             for name, query in _ROWSET_QUERIES.items():
                 rowsets[name] = connection.execute(
@@ -1255,7 +1235,7 @@ def _connection_string_value(
     return value
 
 
-def _normalize_adomd_value(
+def _normalize_ado_value(
     value: Any,
 ) -> Any:
     if value is None:
@@ -1265,6 +1245,22 @@ def _normalize_adomd_value(
         return None
 
     return value
+
+
+def _is_provider_configuration_error(
+    exc: Exception,
+) -> bool:
+    message = str(exc).lower()
+
+    return any(
+        marker in message
+        for marker in (
+            "provider cannot be found",
+            "not properly installed",
+            "class not registered",
+            "msolap",
+        )
+    )
 
 
 def _safe_exception_detail(

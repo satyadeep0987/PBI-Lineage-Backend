@@ -31,8 +31,8 @@ Current capabilities:
 - Parses TMDL semantic model definitions into tables, columns, measures,
   relationships, and hierarchies.
 - Carries semantic model source-path evidence into lineage matches.
-- Extracts XMLA semantic model metadata through an ADOMD adapter when the host
-  has the Analysis Services client libraries configured.
+- Extracts XMLA semantic model metadata through an ADODB COM/MSOLAP adapter
+  when the host has the Analysis Services OLE DB provider configured.
 - Adds lineage diagnostics with match confidence, candidate suggestions, and
   summary counts by status and object type.
 - Exposes provider authentication/scope diagnostics.
@@ -116,14 +116,14 @@ ENVIRONMENT=development
 API_V1_PREFIX=/api/v1
 LOG_LEVEL=INFO
 XMLA_TENANT_NAME=myorg
-XMLA_ADOMD_DLL_PATH=
-XMLA_ACCESS_TOKEN_MINUTES=55
+XMLA_PROVIDER=MSOLAP
 ```
 
-XMLA live extraction requires `pythonnet` plus the Microsoft Analysis Services
-ADOMD client library on the host. If the ADOMD assembly is not discoverable,
-set `XMLA_ADOMD_DLL_PATH` to the installed
-`Microsoft.AnalysisServices.AdomdClient.dll` path.
+XMLA live extraction requires a Windows host with `pywin32` and the Microsoft
+Analysis Services OLE DB Provider (`MSOLAP`) installed. The backend opens an
+`ADODB.Connection` through COM and passes the Power BI access token in the OLE
+DB connection string. Linux/Docker hosts can run the REST/Fabric endpoints, but
+the complete live XMLA path needs Windows or a separate Windows XMLA worker.
 
 ## API Overview
 
@@ -210,14 +210,17 @@ Optional query parameters:
 - `workspaceName`
 - `databaseName`
 
-This endpoint uses the Power BI token dependency and the XMLA ADOMD adapter to
-query `$SYSTEM.TMSCHEMA_*` rowsets for tables, columns, measures, partitions,
-hierarchies, levels, and relationships. Workspace names are URI encoded in the
-`powerbi://api.powerbi.com/v1.0/{tenant}/{workspace}` endpoint.
+This endpoint uses the Power BI token dependency and the XMLA ADODB/MSOLAP
+adapter to query `$SYSTEM.TMSCHEMA_*` rowsets for tables, columns, measures,
+partitions, hierarchies, levels, and relationships. Workspace names are URI
+encoded in the `powerbi://api.powerbi.com/v1.0/{tenant}/{workspace}` endpoint.
+If `workspaceName` or `databaseName` is not supplied, the service resolves the
+workspace name and semantic model name from Power BI REST before opening the
+XMLA connection because XMLA URLs use names, not REST object IDs.
 
-If `pythonnet` or the Microsoft Analysis Services ADOMD assembly is not
-available on the host, the client returns `PROVIDER_INTEGRATION_NOT_CONFIGURED`
-with a setup message.
+If `pywin32`, Windows COM, or the Microsoft Analysis Services OLE DB Provider
+is not available on the host, the client returns
+`PROVIDER_INTEGRATION_NOT_CONFIGURED` with a setup message.
 
 ## Folder Structure
 
@@ -285,11 +288,12 @@ should not contain business normalization logic.
     semantic model definitions.
 - `xmla_client.py`
   - XMLA endpoint and connection-string construction.
-  - ADOMD connection wrapper using the ADOMD `AccessToken` property.
+  - ADODB COM connection wrapper using the Microsoft Analysis Services OLE DB
+    Provider (`MSOLAP`).
   - TMSCHEMA rowset queries and raw metadata mapping for tables, columns,
     measures, partitions, hierarchies, levels, and relationships.
-  - Raises a configured integration error when `pythonnet` or the ADOMD client
-    assembly is unavailable.
+  - Raises a configured integration error when Windows COM, `pywin32`, or
+    `MSOLAP` is unavailable.
 - `snowflake_client.py`
   - Placeholder for future Snowflake integration.
 
@@ -299,7 +303,7 @@ Cross-cutting application infrastructure.
 
 - `config.py`
   - Environment-backed settings.
-  - Includes XMLA tenant, ADOMD DLL path, and access-token expiry settings.
+  - Includes XMLA tenant and OLE DB provider settings.
 - `auth_session.py`
   - Auth cookie name and max-age constants.
 - `microsoft_auth.py`
@@ -433,7 +437,7 @@ Automated tests.
 - `tests/unit/test_report_semantic_lineage_service.py`
   - Report visual field to semantic model object matching and diagnostics.
 - `tests/unit/test_xmla_client.py`
-  - XMLA endpoint encoding, connection-string construction, ADOMD rowset
+  - XMLA endpoint encoding, connection-string construction, ADODB rowset
     mapping, adapter setup failures, and access-token redaction.
 - `tests/unit/test_xmla_metadata_service.py`
   - XMLA metadata contract mapping and validation.
@@ -474,15 +478,17 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.12 | Completed locally | Added XMLA metadata contracts and service/client boundary. |
 | Aug 28, 2026 | Phase 3.12.1 | Completed locally | Corrected Fabric report definition formats to default to PBIR and reject semantic-model-only formats. |
 | Aug 28, 2026 | Phase 3.12.2 | Completed locally | Added upstream provider diagnostic detail for Fabric request and operation failures. |
-| Aug 28, 2026 | Phase 3.13 | Completed locally | Implemented the XMLA ADOMD adapter path and TMSCHEMA metadata extraction mapping. |
+| Aug 28, 2026 | Phase 3.13 | Completed locally | Implemented the XMLA ADODB/MSOLAP adapter path and TMSCHEMA metadata extraction mapping. |
 
 ### Latest Completed Phase
 
-Phase 3.13 is the latest completed local phase. It implements the XMLA ADOMD
-adapter path behind `XmlaClient`, builds encoded Power BI XMLA workspace
-endpoints, uses an ADOMD access token, queries TMSCHEMA rowsets, maps raw XMLA
-metadata into the existing metadata contract, and redacts access tokens from
-XMLA failure details.
+Phase 3.13 is the latest completed local phase. It implements the XMLA
+ADODB/MSOLAP adapter path behind `XmlaClient`, builds encoded Power BI XMLA
+workspace endpoints, passes the Power BI access token through the OLE DB
+connection string, queries TMSCHEMA rowsets, maps raw XMLA metadata into the
+existing metadata contract, and redacts access tokens from XMLA failure
+details. The metadata service resolves the workspace name and semantic model
+name from Power BI REST when callers provide only route IDs.
 
 ### Next Phase
 

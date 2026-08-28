@@ -13,13 +13,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     xmla_tenant_name: str = "myorg"
-    xmla_adomd_dll_path: str | None = None
-    xmla_access_token_minutes: int = 55
+    xmla_provider: str = "MSOLAP"
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
 

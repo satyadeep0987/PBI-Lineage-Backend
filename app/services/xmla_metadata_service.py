@@ -1,7 +1,9 @@
 from typing import Any
 
+from app.clients.powerbi_client import PowerBIClient
 from app.clients.xmla_client import XmlaClient
 from app.core.exceptions import (
+    ProviderResourceNotFoundError,
     UpstreamInvalidResponseError,
 )
 from app.schemas.xmla_metadata import (
@@ -20,8 +22,16 @@ MISSING = object()
 
 
 class XmlaMetadataService:
-    def __init__(self) -> None:
-        self.client = XmlaClient()
+    def __init__(
+        self,
+        *,
+        xmla_client: XmlaClient | None = None,
+        powerbi_client: PowerBIClient | None = None,
+    ) -> None:
+        self.client = xmla_client or XmlaClient()
+        self.powerbi_client = (
+            powerbi_client or PowerBIClient()
+        )
 
     async def get_metadata(
         self,
@@ -32,21 +42,45 @@ class XmlaMetadataService:
         workspace_name: str | None = None,
         database_name: str | None = None,
     ) -> XmlaSemanticModelMetadataResponse:
+        resolved_workspace_name = (
+            await self._resolve_workspace_name(
+                workspace_id=workspace_id,
+                workspace_name=workspace_name,
+                access_token=access_token,
+            )
+        )
+        resolved_database_name = (
+            await self._resolve_database_name(
+                workspace_id=workspace_id,
+                semantic_model_id=(
+                    semantic_model_id
+                ),
+                database_name=database_name,
+                access_token=access_token,
+            )
+        )
+
         raw_metadata = (
             await self.client
             .get_semantic_model_metadata(
                 workspace_id=workspace_id,
                 semantic_model_id=semantic_model_id,
                 access_token=access_token,
-                workspace_name=workspace_name,
-                database_name=database_name,
+                workspace_name=(
+                    resolved_workspace_name
+                ),
+                database_name=(
+                    resolved_database_name
+                ),
             )
         )
 
         xmla_endpoint = (
             self.client.build_workspace_endpoint(
                 workspace_id=workspace_id,
-                workspace_name=workspace_name,
+                workspace_name=(
+                    resolved_workspace_name
+                ),
             )
         )
 
@@ -54,8 +88,96 @@ class XmlaMetadataService:
             workspace_id=workspace_id,
             semantic_model_id=semantic_model_id,
             xmla_endpoint=xmla_endpoint,
-            requested_database_name=database_name,
+            requested_database_name=(
+                resolved_database_name
+            ),
             raw_metadata=raw_metadata,
+        )
+
+    async def _resolve_workspace_name(
+        self,
+        *,
+        workspace_id: str,
+        workspace_name: str | None,
+        access_token: str,
+    ) -> str:
+        if workspace_name:
+            return workspace_name
+
+        raw_workspace = (
+            await self.powerbi_client
+            .get_workspace(
+                workspace_id=workspace_id,
+                access_token=access_token,
+            )
+        )
+        resolved_workspace_name = (
+            raw_workspace.get("name")
+        )
+
+        if (
+            not isinstance(
+                resolved_workspace_name,
+                str,
+            )
+            or not resolved_workspace_name
+        ):
+            raise UpstreamInvalidResponseError(
+                "powerbi"
+            )
+
+        return resolved_workspace_name
+
+    async def _resolve_database_name(
+        self,
+        *,
+        workspace_id: str,
+        semantic_model_id: str,
+        database_name: str | None,
+        access_token: str,
+    ) -> str:
+        if database_name:
+            return database_name
+
+        raw_models = (
+            await self.powerbi_client
+            .get_semantic_models_in_workspace(
+                workspace_id=workspace_id,
+                access_token=access_token,
+            )
+        )
+        target_model_id = (
+            semantic_model_id.lower()
+        )
+
+        for raw_model in raw_models:
+            model_id = raw_model.get("id")
+
+            if (
+                isinstance(model_id, str)
+                and model_id.lower()
+                == target_model_id
+            ):
+                model_name = raw_model.get(
+                    "name"
+                )
+
+                if (
+                    not isinstance(
+                        model_name,
+                        str,
+                    )
+                    or not model_name
+                ):
+                    raise UpstreamInvalidResponseError(
+                        "powerbi"
+                    )
+
+                return model_name
+
+        raise ProviderResourceNotFoundError(
+            "powerbi",
+            "semantic model",
         )
 
     def _map_metadata(

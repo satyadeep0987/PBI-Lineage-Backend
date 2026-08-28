@@ -1,6 +1,7 @@
 import pytest
 
 from app.core.exceptions import (
+    ProviderResourceNotFoundError,
     UpstreamInvalidResponseError,
 )
 from app.services.xmla_metadata_service import (
@@ -38,6 +39,67 @@ class _FakeXmlaClient:
         )
 
         return self.payload
+
+
+class _FakePowerBIClient:
+    def __init__(
+        self,
+        *,
+        workspace_payload: dict | None = None,
+        semantic_models: list[dict] | None = None,
+    ) -> None:
+        self.workspace_payload = (
+            workspace_payload
+            if workspace_payload is not None
+            else {
+                "id": "workspace-123",
+                "name": "Sales Workspace",
+            }
+        )
+        self.semantic_models = (
+            semantic_models
+            if semantic_models is not None
+            else [
+                {
+                    "id": "model-123",
+                    "name": "Sales Model",
+                }
+            ]
+        )
+        self.workspace_calls: list[dict] = []
+        self.semantic_model_calls: list[
+            dict
+        ] = []
+
+    async def get_workspace(
+        self,
+        *,
+        workspace_id: str,
+        access_token: str,
+    ) -> dict:
+        self.workspace_calls.append(
+            {
+                "workspace_id": workspace_id,
+                "access_token": access_token,
+            }
+        )
+
+        return self.workspace_payload
+
+    async def get_semantic_models_in_workspace(
+        self,
+        *,
+        workspace_id: str,
+        access_token: str,
+    ) -> list[dict]:
+        self.semantic_model_calls.append(
+            {
+                "workspace_id": workspace_id,
+                "access_token": access_token,
+            }
+        )
+
+        return self.semantic_models
 
 
 def _metadata_payload() -> dict:
@@ -128,11 +190,14 @@ def _metadata_payload() -> dict:
 
 @pytest.mark.asyncio
 async def test_get_xmla_metadata_maps_client_payload():
-    service = XmlaMetadataService()
     fake_client = _FakeXmlaClient(
         _metadata_payload()
     )
-    service.client = fake_client
+    fake_powerbi_client = _FakePowerBIClient()
+    service = XmlaMetadataService(
+        xmla_client=fake_client,
+        powerbi_client=fake_powerbi_client,
+    )
 
     result = await service.get_metadata(
         workspace_id="workspace-123",
@@ -199,34 +264,95 @@ async def test_get_xmla_metadata_maps_client_payload():
             "database_name": "Sales Model",
         }
     ]
+    assert (
+        fake_powerbi_client.workspace_calls
+        == []
+    )
+    assert (
+        fake_powerbi_client.semantic_model_calls
+        == []
+    )
 
 
 @pytest.mark.asyncio
-async def test_get_xmla_metadata_uses_requested_database_name_fallback():
-    service = XmlaMetadataService()
+async def test_get_xmla_metadata_resolves_missing_names():
     fake_client = _FakeXmlaClient(
         {
             "tables": [],
         }
     )
-    service.client = fake_client
+    fake_powerbi_client = _FakePowerBIClient()
+    service = XmlaMetadataService(
+        xmla_client=fake_client,
+        powerbi_client=fake_powerbi_client,
+    )
 
     result = await service.get_metadata(
         workspace_id="workspace-123",
         semantic_model_id="model-123",
         access_token="token",
-        database_name="Sales Model",
     )
 
     assert result.database_name == "Sales Model"
+    assert result.xmla_endpoint == (
+        "powerbi://api.powerbi.com/v1.0/"
+        "myorg/Sales Workspace"
+    )
     assert result.table_count == 0
+    assert fake_client.calls == [
+        {
+            "workspace_id": "workspace-123",
+            "semantic_model_id": "model-123",
+            "access_token": "token",
+            "workspace_name": "Sales Workspace",
+            "database_name": "Sales Model",
+        }
+    ]
+    assert fake_powerbi_client.workspace_calls == [
+        {
+            "workspace_id": "workspace-123",
+            "access_token": "token",
+        }
+    ]
+    assert (
+        fake_powerbi_client.semantic_model_calls
+        == [
+            {
+                "workspace_id": "workspace-123",
+                "access_token": "token",
+            }
+        ]
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_xmla_metadata_rejects_unresolved_model_name():
+    service = XmlaMetadataService(
+        xmla_client=_FakeXmlaClient(
+            {
+                "tables": [],
+            }
+        ),
+        powerbi_client=_FakePowerBIClient(
+            semantic_models=[]
+        ),
+    )
+
+    with pytest.raises(
+        ProviderResourceNotFoundError
+    ):
+        await service.get_metadata(
+            workspace_id="workspace-123",
+            semantic_model_id="model-123",
+            access_token="token",
+        )
 
 
 @pytest.mark.asyncio
 async def test_get_xmla_metadata_rejects_missing_tables():
-    service = XmlaMetadataService()
-    service.client = _FakeXmlaClient(
-        {}
+    service = XmlaMetadataService(
+        xmla_client=_FakeXmlaClient({}),
+        powerbi_client=_FakePowerBIClient(),
     )
 
     with pytest.raises(
@@ -241,15 +367,17 @@ async def test_get_xmla_metadata_rejects_missing_tables():
 
 @pytest.mark.asyncio
 async def test_get_xmla_metadata_rejects_invalid_table_name():
-    service = XmlaMetadataService()
-    service.client = _FakeXmlaClient(
-        {
-            "tables": [
-                {
-                    "name": "",
-                }
-            ],
-        }
+    service = XmlaMetadataService(
+        xmla_client=_FakeXmlaClient(
+            {
+                "tables": [
+                    {
+                        "name": "",
+                    }
+                ],
+            }
+        ),
+        powerbi_client=_FakePowerBIClient(),
     )
 
     with pytest.raises(

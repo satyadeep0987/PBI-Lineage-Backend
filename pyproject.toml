@@ -7,6 +7,7 @@ dependencies = [
     "httpx>=0.28.1",
     "msal>=1.38.0",
     "pydantic-settings>=2.15.0",
+    "pywin32>=312; platform_system == 'Windows'",
 ]
 
 [tool.fastapi]
