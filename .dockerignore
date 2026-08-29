@@ -1,38 +1,62 @@
+# Git
 .git
 .github
 
+# Python
 .venv
 venv
-
-.env
-.env.*
-!.env.example
-
 __pycache__
 *.pyc
 *.pyo
 *.pyd
 
+# uv / caches
+.uv
+uv-cache
 .pytest_cache
-.ruff_cache
 .mypy_cache
+.ruff_cache
 
+# Tests / coverage
+tests
+test
 .coverage
 htmlcov
 
-.idea
+# IDE
 .vscode
+.idea
 
-.DS_Store
-Thumbs.db
+# Secrets
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.pfx
+*.p12
 
-tests
+# Local authentication/session/token data
+credentials
+credentials/
+tokens
+tokens/
+sessions
+sessions/
+auth-data
+auth-data/
 
+# Logs
 *.log
-logs
+logs/
 
+# Temporary Dockerfiles used during development
+Dockerfile.python-test
+Dockerfile.deps-test
+Dockerfile.app-test
+
+# Misc
 README.md
-
 /local_fastapi_auth_test/
-
 PROJECT_CONTEXT.md
+REF_DOC/

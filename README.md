@@ -41,6 +41,8 @@ Current capabilities:
 - Validates Fabric report definition formats separately from semantic model
   definition formats.
 - Surfaces provider error details for Fabric request and operation failures.
+- Has a locally validated Windows production container image with COM, ADODB,
+  and MSOLAP available at runtime.
 
 Future capabilities:
 
@@ -50,6 +52,8 @@ Future capabilities:
 - Add impact analysis APIs.
 - Add production-grade auth/session storage.
 - Add observability and caching.
+- Publish the verified Windows image to Amazon ECR and deploy it to compatible
+  AWS Windows compute.
 
 ## Technology Stack
 
@@ -61,7 +65,7 @@ Future capabilities:
 - uv
 - pytest / pytest-asyncio
 - ruff
-- Docker
+- Windows Docker Engine / Windows Server Core LTSC 2025
 
 ## Quick Start
 
@@ -95,17 +99,38 @@ Run linting:
 uv run ruff check .
 ```
 
-Build Docker image:
+### Windows Container Deployment
+
+The supported image is Windows-only because XMLA uses `pywin32`, Windows COM,
+`ADODB.Connection`, and the Microsoft Analysis Services OLE DB Provider
+(`MSOLAP`). Do not replace it with a Linux base image unless those dependencies
+are revalidated.
+
+Set `MSOLAP_MSI_URL` to the public x64 Microsoft installer URL, then build the
+production image:
 
 ```powershell
-docker build -t pbi-lineage-backend .
+$MSOLAP_MSI_URL = "<Microsoft MSOLAP x64 MSI URL>"
+docker build `
+  --build-arg "MSOLAP_MSI_URL=$MSOLAP_MSI_URL" `
+  -t pbi-lineage-backend:prod .
 ```
 
-Run Docker container:
+Run the verified local container:
 
 ```powershell
-docker run --rm -p 8000:8000 pbi-lineage-backend
+docker run --rm `
+  --name pbi-lineage-api `
+  -p 8000:8000 `
+  pbi-lineage-backend:prod
 ```
+
+The image starts Uvicorn on `0.0.0.0:8000` with one worker. One worker is
+intentional until the in-memory Microsoft authentication session state is moved
+to shared storage. Local production-image build and container runtime validation
+completed successfully on Windows Server 2025. Confirm health through
+`/api/v1/health`, `/api/v1/health/live`, and `/api/v1/health/ready` before an
+external deployment.
 
 ## Environment
 
@@ -124,8 +149,9 @@ XMLA_PROVIDER=MSOLAP
 XMLA live extraction requires a Windows host with `pywin32` and the Microsoft
 Analysis Services OLE DB Provider (`MSOLAP`) installed. The backend opens an
 `ADODB.Connection` through COM and passes the Power BI access token in the OLE
-DB connection string. Linux/Docker hosts can run the REST/Fabric endpoints, but
-the complete live XMLA path needs Windows or a separate Windows XMLA worker.
+DB connection string. The production Dockerfile supplies and verifies these
+Windows dependencies in a Windows Server Core LTSC 2025 container. Live XMLA
+still needs a Power BI/Fabric capacity with XMLA enabled and a permitted user.
 
 ## API Overview
 
