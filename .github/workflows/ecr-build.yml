@@ -152,15 +152,32 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          $null = aws ecr describe-images `
+          Write-Host "Checking ECR for image tag:"
+          Write-Host $env:IMAGE_TAG
+
+          $json = aws ecr describe-images `
             --repository-name $env:ECR_REPOSITORY `
             --region $env:AWS_REGION `
-            --image-ids "imageTag=$env:IMAGE_TAG" `
-            --query "imageDetails[0].imageDigest" `
-            --output text 2>$null
+            --output json
 
-          if ($LASTEXITCODE -eq 0) {
-              Write-Host "Image already exists for commit $env:IMAGE_TAG"
+          if ($LASTEXITCODE -ne 0) {
+              throw "Unable to query Amazon ECR."
+          }
+
+          $response = $json | ConvertFrom-Json
+
+          $existingImage = $response.imageDetails |
+            Where-Object {
+              $_.imageTags -and
+              ($_.imageTags -contains $env:IMAGE_TAG)
+            } |
+            Select-Object -First 1
+
+          if ($null -ne $existingImage) {
+              Write-Host "Image already exists:"
+              Write-Host $env:IMAGE_URI
+              Write-Host "Digest: $($existingImage.imageDigest)"
+
               "IMAGE_EXISTS=true" |
                 Out-File `
                   -FilePath $env:GITHUB_ENV `
@@ -168,19 +185,16 @@ jobs:
                   -Encoding utf8
           }
           else {
-              Write-Host "No image exists yet for commit $env:IMAGE_TAG"
+              Write-Host "No image exists for this Git commit."
+              Write-Host "The image will be built and pushed."
 
               "IMAGE_EXISTS=false" |
                 Out-File `
                   -FilePath $env:GITHUB_ENV `
                   -Append `
                   -Encoding utf8
-
-              # describe-images returning non-zero is expected when
-              # the immutable SHA image does not exist yet.
-              $global:LASTEXITCODE = 0
           }
-
+          
       # -------------------------------------------------------
       # Login Docker to private ECR
       # -------------------------------------------------------
