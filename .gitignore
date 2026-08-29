@@ -51,3 +51,6 @@ temp/
 
 PROJECT_CONTEXT.md
 REF_DOC/
+
+# Generated ECS deployment files
+deploy/ecs/task-definition.json
