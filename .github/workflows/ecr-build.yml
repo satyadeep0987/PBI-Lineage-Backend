@@ -201,21 +201,27 @@ jobs:
 
       - name: Login Docker to Amazon ECR
         if: env.IMAGE_EXISTS != 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Verify Amazon ECR login
+        if: env.IMAGE_EXISTS != 'true'
         shell: powershell
         run: |
-          $ErrorActionPreference = "Stop"
+          Write-Host "ECR registry:"
+          Write-Host $env:ECR_REGISTRY
 
-          aws ecr get-login-password `
-            --region $env:AWS_REGION |
-          docker login `
-            --username AWS `
-            --password-stdin $env:ECR_REGISTRY
-
-          if ($LASTEXITCODE -ne 0) {
-              throw "Docker login to Amazon ECR failed."
+          if ([string]::IsNullOrWhiteSpace($env:ECR_REGISTRY)) {
+              throw "ECR_REGISTRY is empty."
           }
 
-          Write-Host "Docker authenticated to ECR."
+          docker info
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "Docker Engine is unavailable after ECR login."
+          }
+
+          Write-Host "Amazon ECR authentication completed."
 
       # -------------------------------------------------------
       # Build the actual production Windows image
