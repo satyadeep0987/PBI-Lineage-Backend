@@ -1,0 +1,49 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test FastAPI Backend
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          version: "0.12.6"
+          enable-cache: true
+
+      - name: Install Python
+        shell: powershell
+        run: |
+          uv python install 3.11.16
+
+      - name: Install dependencies
+        shell: powershell
+        run: |
+          uv sync --frozen --dev --python 3.11.16
+
+      - name: Verify core imports
+        shell: powershell
+        run: |
+          uv run --frozen python -c "import fastapi, uvicorn, httpx, msal, win32com.client, pythoncom"
+
+      - name: Run tests
+        shell: powershell
+        run: |
+          uv run --frozen pytest
+          
