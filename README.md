@@ -18,9 +18,12 @@ Current capabilities:
 - Gets one Power BI workspace.
 - Lists Power BI reports in a workspace.
 - Gets one Power BI report.
+- Gets one report from the authenticated user's My workspace.
 - Lists report pages.
 - Gets one report page.
 - Lists Power BI semantic models/datasets in a workspace.
+- Lists Power BI gateways for which the authenticated user is an administrator.
+- Gets connection metadata for one datasource on an accessible Power BI gateway.
 - Retrieves Fabric report definitions.
 - Decodes and normalizes PBIR report definitions.
 - Extracts visual titles, visual positions, visual types, page metadata, and
@@ -41,8 +44,10 @@ Current capabilities:
 - Validates Fabric report definition formats separately from semantic model
   definition formats.
 - Surfaces provider error details for Fabric request and operation failures.
-- Has a locally validated Windows production container image with COM, ADODB,
-  and MSOLAP available at runtime.
+- Runs in a deployed Windows container environment with COM, ADODB, and MSOLAP
+  available at runtime.
+- Is publicly hosted over HTTPS through Cloudflare DNS, an AWS Application Load
+  Balancer, and a private Windows ECS task.
 
 Future capabilities:
 
@@ -52,8 +57,10 @@ Future capabilities:
 - Add impact analysis APIs.
 - Add production-grade auth/session storage.
 - Add observability and caching.
-- Publish the verified Windows image to Amazon ECR and deploy it to compatible
-  AWS Windows compute.
+- Parse gateway connection details into physical-source mappings.
+- Automate ECS task-definition registration and service rollout after an
+  immutable Amazon ECR image is published.
+- Add production high availability, alarms, and autoscaling.
 
 ## Technology Stack
 
@@ -66,6 +73,10 @@ Future capabilities:
 - pytest / pytest-asyncio
 - ruff
 - Windows Docker Engine / Windows Server Core LTSC 2025
+- Amazon ECR, ECS EC2 (Windows Server 2025), Application Load Balancer, and
+  CloudWatch Logs
+- GitHub Actions with OIDC and a dedicated Windows self-hosted build runner
+- Cloudflare DNS and AWS Certificate Manager
 
 ## Quick Start
 
@@ -128,9 +139,42 @@ docker run --rm `
 The image starts Uvicorn on `0.0.0.0:8000` with one worker. One worker is
 intentional until the in-memory Microsoft authentication session state is moved
 to shared storage. Local production-image build and container runtime validation
-completed successfully on Windows Server 2025. Confirm health through
-`/api/v1/health`, `/api/v1/health/live`, and `/api/v1/health/ready` before an
-external deployment.
+completed successfully on Windows Server 2025, and the image is now deployed on
+AWS Windows ECS capacity.
+
+### Hosted AWS Deployment
+
+The public backend is available at `https://api.<domain>`. The root domain is
+intentionally separate so it can host a future frontend.
+
+```text
+Cloudflare DNS
+  -> AWS Application Load Balancer HTTPS :443
+  -> private ECS Windows task HTTP :8000
+  -> FastAPI
+```
+
+- AWS Region: `ap-south-1`.
+- The ECR repository stores immutable images tagged with the full Git SHA.
+- The ECS service uses Windows Server 2025 EC2 capacity, `awsvpc` networking,
+  and private task IPs. Port `8000` is reachable only from the load balancer
+  security group.
+- The load balancer redirects HTTP `:80` to HTTPS `:443`; its target group uses
+  `GET /api/v1/health` as the health check.
+- GitHub Actions authenticates to AWS with OIDC and builds Windows images on a
+  dedicated self-hosted Windows runner. ECR build/push is operational; automatic
+  ECS rollout after the push is the remaining CI/CD automation step.
+
+Check the hosted service:
+
+```text
+https://api.<domain>/api/v1/health
+https://api.<domain>/docs
+```
+
+Deployment architecture, operational procedures, and recovery guidance are in
+[`REF_DOC/PBI-Lineage-Backend-Deployment-Context.md`](REF_DOC/PBI-Lineage-Backend-Deployment-Context.md)
+and [`REF_DOC/PBI-Lineage-Backend-AWS-Deployment-Runbook.md`](REF_DOC/PBI-Lineage-Backend-AWS-Deployment-Runbook.md).
 
 ## Environment
 
@@ -194,7 +238,24 @@ GET /api/v1/workspaces/{workspace_id}/reports/{report_id}
 GET /api/v1/workspaces/{workspace_id}/reports/{report_id}/pages
 GET /api/v1/workspaces/{workspace_id}/reports/{report_id}/pages/{page_name}
 GET /api/v1/workspaces/{workspace_id}/semantic-models
+GET /api/v1/reports/{report_id}
 ```
+
+`GET /api/v1/reports/{report_id}` uses the Power BI **My workspace** endpoint.
+It is distinct from the existing workspace-scoped report route.
+
+### Power BI Gateways
+
+```text
+GET /api/v1/gateways
+GET /api/v1/gateways/{gateway_id}/datasources/{datasource_id}
+```
+
+Gateway endpoints require a Power BI token with `Dataset.Read.All` or
+`Dataset.ReadWrite.All`, and the authenticated user must be a gateway admin.
+Virtual network gateways are not supported by these Power BI APIs. Datasource
+responses preserve connection metadata and credential type, but never expose
+credential values.
 
 ### Fabric Definitions
 
@@ -301,7 +362,8 @@ Application factory and FastAPI entrypoint. It configures:
 FastAPI routing layer.
 
 - `app/api/router.py`
-  - Combines all v1 routers under health, auth, and workspaces.
+  - Combines all v1 routers under health, auth, workspaces, reports, and
+    gateways.
 - `app/api/v1/health.py`
   - Health, liveness, and readiness endpoints.
 - `app/api/v1/auth.py`
@@ -311,6 +373,10 @@ FastAPI routing layer.
   - Workspace, report, page, semantic model, report definition, normalized
     report definition, semantic model definition, semantic metadata,
     semantic lineage, and XMLA metadata endpoints.
+- `app/api/v1/reports.py`
+  - My workspace Power BI report-detail endpoint.
+- `app/api/v1/gateways.py`
+  - Gateway discovery and single gateway datasource endpoints.
 - `app/api/dependencies/credentials.py`
   - FastAPI dependencies for extracting Power BI and Fabric access tokens from
     the auth session cookie.
@@ -324,7 +390,8 @@ should not contain business normalization logic.
   - Shared HTTP behavior, provider error mapping, and upstream error-detail
     extraction.
 - `powerbi_client.py`
-  - Power BI REST API client.
+  - Power BI REST API client for workspace resources, My workspace report
+    detail, gateways, and gateway datasources.
 - `fabric_client.py`
   - Microsoft Fabric API client.
   - Handles report and semantic model definition endpoints and long-running
@@ -376,6 +443,8 @@ Pydantic API contracts.
   - Workspace list/detail responses.
 - `report.py`
   - Report list/detail responses.
+- `gateway.py`
+  - Gateway list/detail and gateway datasource response contracts.
 - `report_page.py`
   - Report page list/detail responses.
 - `semantic_model.py`
@@ -414,7 +483,10 @@ Business logic layer. Routes call services; services call clients.
 - `workspace_service.py`
   - Maps Power BI workspace payloads.
 - `report_service.py`
-  - Maps Power BI reports and pages.
+  - Maps workspace-scoped and My workspace Power BI reports, plus pages.
+- `gateway_service.py`
+  - Maps gateway and gateway datasource metadata, validates provider identity,
+    and preserves non-secret connection information.
 - `semantic_model_service.py`
   - Maps Power BI datasets/semantic models.
 - `report_definition_service.py`
@@ -467,11 +539,17 @@ Automated tests.
 - `tests/api/test_auth.py`
   - Device auth route/status/logout behavior.
 - `tests/api/test_report_resources.py`
-  - Report route behavior with dependency overrides.
+  - Workspace and My workspace report-route behavior with dependency overrides.
+- `tests/api/test_gateway_resources.py`
+  - Gateway route behavior with Power BI authentication overrides.
 - `tests/unit/test_microsoft_auth.py`
   - Scope diagnostic helper tests.
 - `tests/unit/test_report_service.py`
-  - Report service mapping/validation.
+  - Workspace and My workspace report-service mapping/validation.
+- `tests/unit/test_powerbi_client.py`
+  - My workspace report, gateway, and gateway datasource URL construction.
+- `tests/unit/test_gateway_service.py`
+  - Gateway and datasource mapping, including provider identity validation.
 - `tests/unit/test_semantic_model_service.py`
   - Semantic model service mapping/validation.
 - `tests/unit/test_report_definition_service.py`
@@ -532,22 +610,28 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.12.2 | Completed locally | Added upstream provider diagnostic detail for Fabric request and operation failures. |
 | Aug 28, 2026 | Phase 3.13 | Completed locally | Implemented the XMLA ADODB/MSOLAP adapter path and TMSCHEMA metadata extraction mapping. |
 | Aug 28, 2026 | Phase 3.14 | Completed locally | Added source-preserving Fabric TMDL/XMLA semantic metadata reconciliation. |
+| Aug 31, 2026 | Phase 6.0 | Completed locally | Added My workspace report detail, gateway discovery, and gateway datasource metadata contracts. |
 
 The Phase 3.6-3.14 execution labels are retained for history. Against the
 original roadmap, they finish Phase 3 report-level lineage and implement Phase
-4 semantic model metadata. The next numbered roadmap work is Phase 5.1.
+4 semantic model metadata. Phase 6.0 is a scoped gateway/datasource discovery
+addition; it does not complete the remaining Phase 6 physical-source work. The
+next numbered roadmap work remains Phase 5.1.
 
 ### Latest Completed Phase
 
-Phase 3.14 is the latest completed local phase. It adds a combined semantic
-metadata endpoint that retrieves parsed Fabric TMDL and XMLA metadata using
-their respective tokens, preserves both source payloads, validates route/source
-identity, and reconciles semantic objects without silently choosing a winner.
-TMDL remains the source-path authority; XMLA contributes live runtime metadata.
+Phase 6.0 is the latest completed local addition. It exposes the Power BI My
+workspace report-detail endpoint and gateway discovery/datasource metadata
+endpoints. It validates gateway/datasource identity before returning normalized
+connection metadata. TMDL remains the source-path authority for semantic-model
+definition evidence; XMLA contributes live runtime metadata.
 
 ### Next Phase
 
 Original Phase 5.1 - Measure DAX Parsing is the next implementation phase.
+
+Phase 6.1-6.4 remain pending. Phase 6.0 does not parse Power Query/M, detect
+physical sources, or map logical objects to physical objects.
 
 The Phase 3.14 implementation has a tenant-dependent acceptance check that is
 not part of local automated testing:

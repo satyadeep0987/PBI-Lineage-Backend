@@ -136,6 +136,42 @@ def test_get_report(
     assert payload["format"] == "PBIR"
 
 
+def test_get_my_workspace_report(
+    client,
+    monkeypatch,
+):
+    async def fake_get_my_workspace_report(
+        self,
+        *,
+        report_id: str,
+        access_token: str,
+    ) -> Report:
+        assert access_token == "fake-test-token"
+
+        return Report(
+            id=report_id,
+            name="My Workspace Sales Report",
+            dataset_id="dataset-1",
+        )
+
+    monkeypatch.setattr(
+        ReportService,
+        "get_my_workspace_report",
+        fake_get_my_workspace_report,
+    )
+
+    response = client.get(
+        f"/api/v1/reports/{REPORT_ID}"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == REPORT_ID
+    assert (
+        response.json()["name"]
+        == "My Workspace Sales Report"
+    )
+
+
 def test_list_report_pages(
     client,
     monkeypatch,

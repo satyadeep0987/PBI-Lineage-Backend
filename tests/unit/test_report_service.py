@@ -218,6 +218,32 @@ async def test_get_report_maps_report_detail():
 
 
 @pytest.mark.asyncio
+async def test_get_my_workspace_report_maps_report_detail():
+    service = ReportService()
+
+    service.client.get_report_in_my_workspace = AsyncMock(
+        return_value={
+            "id": "report-1",
+            "name": "My Workspace Sales Report",
+            "datasetId": "dataset-1",
+            "reportType": "PowerBIReport",
+        }
+    )
+
+    result = await service.get_my_workspace_report(
+        report_id="report-1",
+        access_token="fake-token",
+    )
+
+    assert result.id == "report-1"
+    assert result.name == "My Workspace Sales Report"
+    service.client.get_report_in_my_workspace.assert_awaited_once_with(
+        report_id="report-1",
+        access_token="fake-token",
+    )
+
+
+@pytest.mark.asyncio
 async def test_list_pages_maps_pages():
     service = ReportService()
 
