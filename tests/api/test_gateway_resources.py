@@ -7,6 +7,7 @@ from app.main import app
 from app.schemas.gateway import (
     Gateway,
     GatewayDatasource,
+    GatewayDatasourceListResponse,
     GatewayListResponse,
 )
 from app.services.gateway_service import GatewayService
@@ -99,6 +100,44 @@ def test_get_gateway_datasource(
     assert response.status_code == 200
     assert response.json()["id"] == DATASOURCE_ID
     assert response.json()["gateway_id"] == GATEWAY_ID
+
+
+def test_list_gateway_datasources(
+    client,
+    monkeypatch,
+):
+    async def fake_list_datasources(
+        self,
+        *,
+        gateway_id: str,
+        access_token: str,
+    ) -> GatewayDatasourceListResponse:
+        assert gateway_id == GATEWAY_ID
+        assert access_token == "fake-test-token"
+
+        return GatewayDatasourceListResponse(
+            gateway_id=gateway_id,
+            datasources=[
+                GatewayDatasource(
+                    id=DATASOURCE_ID,
+                    gateway_id=gateway_id,
+                    datasource_type="Sql",
+                )
+            ],
+            count=1,
+        )
+
+    monkeypatch.setattr(
+        GatewayService,
+        "list_datasources",
+        fake_list_datasources,
+    )
+
+    response = client.get(f"/api/v1/gateways/{GATEWAY_ID}/datasources")
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+    assert response.json()["datasources"][0]["id"] == DATASOURCE_ID
 
 
 def test_gateway_datasource_rejects_invalid_gateway_uuid(

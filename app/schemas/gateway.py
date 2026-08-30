@@ -34,3 +34,9 @@ class GatewayDatasource(BaseModel):
     connection_details: str | None = None
     credential_type: str | None = None
     credential_details: GatewayDatasourceCredentialDetails | None = None
+
+
+class GatewayDatasourceListResponse(BaseModel):
+    gateway_id: str
+    datasources: list[GatewayDatasource]
+    count: int

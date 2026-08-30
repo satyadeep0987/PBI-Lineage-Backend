@@ -4,6 +4,7 @@ from app.api.v1 import (
     auth,
     gateways,
     health,
+    lineage,
     reports,
     workspaces,
 )
@@ -38,4 +39,10 @@ api_router.include_router(
     gateways.router,
     prefix="/gateways",
     tags=["Gateways"],
+)
+
+api_router.include_router(
+    lineage.router,
+    prefix="/lineage",
+    tags=["Lineage"],
 )

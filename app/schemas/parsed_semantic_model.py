@@ -48,12 +48,22 @@ class ParsedSemanticModelHierarchy(BaseModel):
     levels: list[ParsedSemanticModelHierarchyLevel] = Field(default_factory=list)
 
 
+class ParsedSemanticModelPartition(BaseModel):
+    name: str
+    source_path: str | None = None
+    mode: str | None = None
+    source_type: str | None = None
+    expression: str | None = None
+
+
 class ParsedSemanticModelTable(BaseModel):
     name: str
     source_path: str | None = None
+    expression: str | None = None
     columns: list[ParsedSemanticModelColumn] = Field(default_factory=list)
     measures: list[ParsedSemanticModelMeasure] = Field(default_factory=list)
     hierarchies: list[ParsedSemanticModelHierarchy] = Field(default_factory=list)
+    partitions: list[ParsedSemanticModelPartition] = Field(default_factory=list)
 
 
 class ParsedSemanticModelResponse(BaseModel):

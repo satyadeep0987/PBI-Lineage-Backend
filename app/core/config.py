@@ -1,5 +1,7 @@
 from functools import lru_cache
+from typing import Literal
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +16,24 @@ class Settings(BaseSettings):
 
     xmla_tenant_name: str = "myorg"
     xmla_provider: str = "MSOLAP"
+
+    lineage_database_path: str = "data/lineage.db"
+    lineage_cache_ttl_seconds: float = Field(default=30.0, ge=0.0)
+    lineage_cache_max_entries: int = Field(default=128, ge=1)
+    lineage_scan_max_concurrency: int = Field(default=2, ge=1, le=32)
+
+    cors_allowed_origins: list[str] = Field(default_factory=list)
+    allowed_hosts: list[str] = Field(default_factory=lambda: ["*"])
+    force_https: bool = False
+    enable_api_docs: bool = True
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    max_request_body_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        ge=1024,
+    )
+    lineage_admin_api_key: SecretStr | None = None
+    expose_metrics: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

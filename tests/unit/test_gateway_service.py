@@ -66,6 +66,30 @@ async def test_get_datasource_maps_connection_and_credential_metadata():
 
 
 @pytest.mark.asyncio
+async def test_list_datasources_maps_gateway_collection():
+    service = GatewayService()
+    service.client.get_gateway_datasources = AsyncMock(
+        return_value=[
+            {
+                "id": "datasource-1",
+                "gatewayId": "gateway-1",
+                "datasourceType": "Sql",
+                "connectionDetails": '{"server":"sql.example"}',
+            }
+        ]
+    )
+
+    result = await service.list_datasources(
+        gateway_id="gateway-1",
+        access_token="fake-token",
+    )
+
+    assert result.gateway_id == "gateway-1"
+    assert result.count == 1
+    assert result.datasources[0].id == "datasource-1"
+
+
+@pytest.mark.asyncio
 async def test_get_datasource_rejects_mismatched_provider_ids():
     service = GatewayService()
     service.client.get_gateway_datasource = AsyncMock(

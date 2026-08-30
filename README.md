@@ -1,8 +1,8 @@
 # PBI Lineage Backend
 
 Standalone FastAPI backend for Power BI and Microsoft Fabric metadata discovery,
-report definition retrieval, PBIR normalization, and future lineage/impact
-analysis.
+report definition retrieval, PBIR normalization, physical-source discovery,
+lineage graph construction, and impact analysis.
 
 This backend is being split out from the original Streamlit-based PBI Lineage
 Explorer so the application can evolve into a cleaner service-oriented
@@ -24,6 +24,7 @@ Current capabilities:
 - Lists Power BI semantic models/datasets in a workspace.
 - Lists Power BI gateways for which the authenticated user is an administrator.
 - Gets connection metadata for one datasource on an accessible Power BI gateway.
+- Lists datasources on an accessible Power BI gateway.
 - Retrieves Fabric report definitions.
 - Decodes and normalizes PBIR report definitions.
 - Extracts visual titles, visual positions, visual types, page metadata, and
@@ -32,7 +33,7 @@ Current capabilities:
   filters, and projections.
 - Retrieves Fabric semantic model definitions in TMDL/TMSL format.
 - Parses TMDL semantic model definitions into tables, columns, measures,
-  relationships, and hierarchies.
+  relationships, hierarchies, calculated tables, and Power Query partitions.
 - Carries semantic model source-path evidence into lineage matches.
 - Extracts XMLA semantic model metadata through an ADODB COM/MSOLAP adapter
   when the host has the Analysis Services OLE DB provider configured.
@@ -48,19 +49,41 @@ Current capabilities:
   available at runtime.
 - Is publicly hosted over HTTPS through Cloudflare DNS, an AWS Application Load
   Balancer, and a private Windows ECS task.
+- Parses measure, calculated-column, and calculated-table DAX references and
+  reports unresolved references and dependency cycles.
+- Extracts supported Power Query/M connectors, native SQL objects, navigation
+  targets, files, URLs, storage accounts, and query-to-source mappings.
+- Parses an allowlisted, non-secret subset of gateway `connectionDetails` and
+  matches gateway datasources to detected query sources.
+- Builds canonical upstream-to-downstream lineage graphs spanning physical
+  sources, queries, semantic objects, DAX dependencies, and report visuals.
+- Provides reverse impact, graph search, and upstream/downstream navigation.
+- Discovers workspace-level report/semantic-model inventory and bindings.
+- Optionally normalizes Snowflake `ACCOUNT_USAGE.OBJECT_DEPENDENCIES` and can
+  retrieve it through the Snowflake SQL API without a required runtime driver.
+- Persists versioned graph snapshots in SQLite, detects incremental changes,
+  caches graph reads, runs asynchronous scan jobs, and validates lineage quality.
+- Builds synchronous or asynchronous live lineage scans from workspace/model
+  IDs and an optional report ID using the current Fabric and Power BI session.
+  Provider tokens stay in process memory and are never written to scan-job
+  payloads or graph storage.
+- Provides configurable API-key enforcement, secure headers/cookies, trusted
+  hosts, request-size limits, readiness checks, and Prometheus-format metrics.
 
-Future capabilities:
+Remaining acceptance and scale work:
 
 - Improve semantic model parser coverage for more TMDL shapes.
 - Run live XMLA acceptance validation against a Power BI/Fabric capacity.
-- Add Snowflake lineage.
-- Add impact analysis APIs.
 - Add production-grade auth/session storage.
-- Add observability and caching.
-- Parse gateway connection details into physical-source mappings.
+- Move lineage persistence and scan coordination to shared infrastructure before
+  running multiple API workers/tasks.
+- Expand DAX and Power Query grammar coverage with tenant-derived fixtures.
 - Automate ECS task-definition registration and service rollout after an
   immutable Amazon ECR image is published.
 - Add production high availability, alarms, and autoscaling.
+
+PowerAI is intentionally deferred until the backend and frontend lineage
+workflows are complete. No PowerAI endpoint or service is included in this phase.
 
 ## Technology Stack
 
@@ -188,7 +211,26 @@ API_V1_PREFIX=/api/v1
 LOG_LEVEL=INFO
 XMLA_TENANT_NAME=myorg
 XMLA_PROVIDER=MSOLAP
+LINEAGE_DATABASE_PATH=data/lineage.db
+LINEAGE_CACHE_TTL_SECONDS=30
+LINEAGE_CACHE_MAX_ENTRIES=128
+LINEAGE_SCAN_MAX_CONCURRENCY=2
+CORS_ALLOWED_ORIGINS=[]
+ALLOWED_HOSTS=["*"]
+FORCE_HTTPS=false
+ENABLE_API_DOCS=true
+AUTH_COOKIE_SECURE=false
+AUTH_COOKIE_SAMESITE=lax
+MAX_REQUEST_BODY_BYTES=10485760
+EXPOSE_METRICS=true
 ```
+
+For production, set `AUTH_COOKIE_SECURE=true`, configure explicit
+`ALLOWED_HOSTS`, provide `LINEAGE_ADMIN_API_KEY`, and normally disable API docs.
+`CORS_ALLOWED_ORIGINS` and `ALLOWED_HOSTS` use JSON-list syntax in environment
+variables. SQLite and the in-process scan scheduler match the current
+single-worker deployment; move both to shared infrastructure before scaling to
+multiple workers or tasks.
 
 XMLA live extraction requires a Windows host with `pywin32` and the Microsoft
 Analysis Services OLE DB Provider (`MSOLAP`) installed. The backend opens an
@@ -207,6 +249,7 @@ All endpoints are mounted under `/api/v1`.
 GET /api/v1/health
 GET /api/v1/health/live
 GET /api/v1/health/ready
+GET /api/v1/health/metrics
 ```
 
 ### Authentication
@@ -248,6 +291,7 @@ It is distinct from the existing workspace-scoped report route.
 
 ```text
 GET /api/v1/gateways
+GET /api/v1/gateways/{gateway_id}/datasources
 GET /api/v1/gateways/{gateway_id}/datasources/{datasource_id}
 ```
 
@@ -256,6 +300,48 @@ Gateway endpoints require a Power BI token with `Dataset.Read.All` or
 Virtual network gateways are not supported by these Power BI APIs. Datasource
 responses preserve connection metadata and credential type, but never expose
 credential values.
+
+### Unified Lineage
+
+```text
+POST /api/v1/lineage/dax/analyze
+POST /api/v1/lineage/physical-sources/analyze
+POST /api/v1/lineage/snowflake/normalize
+POST /api/v1/lineage/snowflake/discover
+POST /api/v1/lineage/graphs
+POST /api/v1/lineage/live-graphs
+GET  /api/v1/lineage/graphs/{graph_id}
+GET  /api/v1/lineage/graphs/{graph_id}/versions
+GET  /api/v1/lineage/graphs/{graph_id}/impact/{node_id}
+GET  /api/v1/lineage/graphs/{graph_id}/search
+GET  /api/v1/lineage/graphs/{graph_id}/navigate/{node_id}
+GET  /api/v1/lineage/graphs/{graph_id}/changes
+GET  /api/v1/lineage/graphs/{graph_id}/validate
+GET  /api/v1/lineage/estate/discover
+POST /api/v1/lineage/scan-jobs
+POST /api/v1/lineage/scan-jobs/live
+GET  /api/v1/lineage/scan-jobs/{job_id}
+```
+
+Graph edges use upstream-to-downstream direction. Containment and semantic-model
+relationship edges are marked as non-lineage so downstream impact traversals do
+not confuse ownership structure with data flow. Re-saving unchanged graph
+content does not create a new version; changed content receives the next SQLite
+snapshot version and can be compared through the `changes` endpoint.
+
+When `LINEAGE_ADMIN_API_KEY` is configured, every `/lineage` endpoint requires
+the `X-Lineage-Admin-Key` header. Power BI estate discovery additionally uses
+the existing authenticated Microsoft session. Gateway `connectionDetails`
+parsing is restricted to an allowlist of endpoint metadata and never includes
+credential values.
+
+`live-graphs` retrieves parsed Fabric TMDL, optionally retrieves and matches a
+report definition, and optionally enriches Power Query sources with accessible
+gateway datasource metadata. `scan-jobs/live` runs the same pipeline in the
+bounded background-job manager. Neither endpoint persists provider tokens.
+Snowflake discovery accepts its short-lived credential only through the
+`Authorization: Bearer` header; account, warehouse, role, and token type remain
+non-secret request fields.
 
 ### Fabric Definitions
 
@@ -336,6 +422,7 @@ app/
   clients/
   core/
   domain/
+  repositories/
   schemas/
   services/
   utils/
@@ -351,7 +438,10 @@ tests/
 Application factory and FastAPI entrypoint. It configures:
 
 - App metadata.
-- CORS middleware.
+- Explicit CORS and trusted-host middleware.
+- Optional HTTPS redirects.
+- Security headers and request-body limits.
+- HTTP metrics and structured request logging.
 - Request logging middleware.
 - Request ID middleware.
 - Exception handlers.
@@ -362,8 +452,8 @@ Application factory and FastAPI entrypoint. It configures:
 FastAPI routing layer.
 
 - `app/api/router.py`
-  - Combines all v1 routers under health, auth, workspaces, reports, and
-    gateways.
+  - Combines all v1 routers under health, auth, workspaces, reports, gateways,
+    and lineage.
 - `app/api/v1/health.py`
   - Health, liveness, and readiness endpoints.
 - `app/api/v1/auth.py`
@@ -376,10 +466,18 @@ FastAPI routing layer.
 - `app/api/v1/reports.py`
   - My workspace Power BI report-detail endpoint.
 - `app/api/v1/gateways.py`
-  - Gateway discovery and single gateway datasource endpoints.
+  - Gateway discovery plus gateway datasource list/detail endpoints.
+- `app/api/v1/lineage.py`
+  - Unified DAX, physical-source, Snowflake normalization, supplied-evidence
+    and live graph, impact, search, navigation, versioning, validation, estate,
+    and scan-job endpoints.
 - `app/api/dependencies/credentials.py`
   - FastAPI dependencies for extracting Power BI and Fabric access tokens from
     the auth session cookie.
+- `app/api/dependencies/lineage.py`
+  - Singleton lineage repository, cache/store, and scan-manager dependencies.
+- `app/api/dependencies/security.py`
+  - Optional constant-time lineage administration API-key enforcement.
 
 ### `app/clients`
 
@@ -407,7 +505,9 @@ should not contain business normalization logic.
   - Raises a configured integration error when Windows COM, `pywin32`, or
     `MSOLAP` is unavailable.
 - `snowflake_client.py`
-  - Placeholder for future Snowflake integration.
+  - Optional Snowflake SQL API client for
+    `SNOWFLAKE.ACCOUNT_USAGE.OBJECT_DEPENDENCIES`, including asynchronous
+    statement polling and OAuth/key-pair token-type headers.
 
 ### `app/core`
 
@@ -433,7 +533,17 @@ Cross-cutting application infrastructure.
 - `request_logging.py`
   - Structured request completion logs.
 - `security.py`
-  - Reserved for future security helpers.
+  - Security response headers and request-body size enforcement.
+- `metrics.py`
+  - Low-cardinality HTTP counters, duration summaries, in-progress gauge, and
+    Prometheus rendering.
+
+### `app/repositories`
+
+- `lineage_repository.py`
+  - SQLite schema and access layer for immutable graph versions and persisted
+    scan-job status. Graph content hashes exclude capture time so unchanged
+    snapshots are deduplicated.
 
 ### `app/schemas`
 
@@ -455,7 +565,16 @@ Pydantic API contracts.
   - Raw Fabric semantic model definition response.
 - `parsed_semantic_model.py`
   - Parsed TMDL semantic model response with tables, columns, measures,
-    relationships, hierarchies, warnings, and source-path evidence.
+    relationships, hierarchies, partitions, warnings, and source-path evidence.
+- `dax_dependency.py`, `physical_source.py`, `snowflake_lineage.py`
+  - DAX dependency, Power Query/gateway physical-source, and optional Snowflake
+    lineage contracts.
+- `lineage_graph.py`, `impact_analysis.py`, `estate.py`
+  - Canonical graph, reverse impact, and estate discovery contracts.
+- `lineage_persistence.py`, `lineage_change.py`, `lineage_search.py`
+  - Snapshot/version, incremental diff, search, and navigation contracts.
+- `lineage_validation.py`, `scan_job.py`, `operations.py`
+  - Data-quality validation, asynchronous jobs, and readiness contracts.
 - `normalized_report_definition.py`
   - API shape for normalized PBIR reports, pages, visuals, positions, semantic
     model references, and visual field references.
@@ -485,8 +604,8 @@ Business logic layer. Routes call services; services call clients.
 - `report_service.py`
   - Maps workspace-scoped and My workspace Power BI reports, plus pages.
 - `gateway_service.py`
-  - Maps gateway and gateway datasource metadata, validates provider identity,
-    and preserves non-secret connection information.
+  - Maps gateway and gateway datasource list/detail metadata, validates provider
+    identity, and preserves non-secret connection information.
 - `semantic_model_service.py`
   - Maps Power BI datasets/semantic models.
 - `report_definition_service.py`
@@ -516,6 +635,36 @@ Business logic layer. Routes call services; services call clients.
     semantic model references, and warnings.
 - `visual_field_reference_extractor.py`
   - Extracts visual-to-field references from PBIR visual semantic queries.
+- `dax_dependency_service.py`
+  - Resolves DAX references for measures and calculated columns/tables and uses
+    strongly connected components for dependency-cycle detection.
+- `physical_source_service.py`
+  - Extracts supported Power Query/M connector calls, navigation targets,
+    native SQL objects, and query-level mappings; safely reconciles gateway
+    connection endpoints.
+- `lineage_graph_service.py`
+  - Constructs canonical stable-ID nodes and upstream-to-downstream edges across
+    source, query, semantic, DAX, Snowflake, and report evidence.
+- `impact_analysis_service.py`, `lineage_search_service.py`
+  - Downstream impact traversal plus graph search and neighborhood navigation.
+- `estate_discovery_service.py`
+  - Discovers workspaces, reports, semantic models, report/model bindings, and
+    a canonical estate graph while retaining partial-workspace warnings.
+- `snowflake_lineage_service.py`
+  - Normalizes Snowflake object-dependency rows and deduplicates objects/edges.
+- `lineage_store_service.py`, `ttl_cache.py`
+  - Cached access to versioned SQLite graph snapshots.
+- `lineage_change_service.py`, `lineage_validation_service.py`
+  - Version-to-version graph diffs and structural/data-quality checks.
+- `scan_job_service.py`
+  - Bounded asynchronous supplied-evidence and live graph-build jobs with
+    persisted status and interrupted-job recovery; provider tokens are retained
+    only by the running task.
+- `live_lineage_scan_service.py`
+  - Retrieves parsed TMDL plus optional report/gateway evidence and assembles a
+    validated canonical graph from live provider resources.
+- `operations_service.py`
+  - Database and production security configuration readiness checks.
 - `services/auth/device_auth_store.py`
   - In-memory device auth session/token store.
 - `services/auth/microsoft_device_auth_service.py`
@@ -528,7 +677,8 @@ Business logic layer. Routes call services; services call clients.
 - `services/auth/microsoft_auth_service.py`
   - Commented PKCE preparation helper from earlier auth design.
 - `services/auth/snowflake_auth_service.py`
-  - Placeholder for future Snowflake auth.
+  - Optional Snowflake SQL API orchestration; no Snowflake credential is needed
+    unless this integration is explicitly called.
 
 ### `tests`
 
@@ -542,6 +692,8 @@ Automated tests.
   - Workspace and My workspace report-route behavior with dependency overrides.
 - `tests/api/test_gateway_resources.py`
   - Gateway route behavior with Power BI authentication overrides.
+- `tests/api/test_lineage_resources.py`
+  - Unified graph build/store/version/search/validation and analysis endpoints.
 - `tests/unit/test_microsoft_auth.py`
   - Scope diagnostic helper tests.
 - `tests/unit/test_report_service.py`
@@ -579,6 +731,22 @@ Automated tests.
   - Visual semantic field extraction.
 - `tests/unit/test_logging.py`
   - Sensitive value redaction.
+- `tests/unit/test_dax_dependency_service.py`
+  - DAX dependencies, unresolved references, string/comment exclusion, cycles.
+- `tests/unit/test_physical_source_service.py`
+  - Power Query/M, native SQL, gateway sanitization, and source mappings.
+- `tests/unit/test_lineage_graph_service.py`
+  - Canonical graph and end-to-end downstream impact paths.
+- `tests/unit/test_estate_discovery_service.py`
+  - Estate inventory, report/model bindings, and estate graph behavior.
+- `tests/unit/test_snowflake_lineage_service.py`
+  - Snowflake dependency normalization and SQL API request contracts.
+- `tests/unit/test_lineage_platform_services.py`
+  - SQLite versions, diffs, TTL cache, search/navigation, validation, and jobs.
+- `tests/unit/test_live_lineage_scan_service.py`
+  - Live TMDL/gateway orchestration, partial gateway access, and graph output.
+- `tests/unit/test_security_operations.py`
+  - Security headers, API-key enforcement, body limits, readiness, and metrics.
 
 ## Phase History
 
@@ -611,27 +779,32 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.13 | Completed locally | Implemented the XMLA ADODB/MSOLAP adapter path and TMSCHEMA metadata extraction mapping. |
 | Aug 28, 2026 | Phase 3.14 | Completed locally | Added source-preserving Fabric TMDL/XMLA semantic metadata reconciliation. |
 | Aug 31, 2026 | Phase 6.0 | Completed locally | Added My workspace report detail, gateway discovery, and gateway datasource metadata contracts. |
+| Aug 31, 2026 | Phase 5.1-5.5 | Completed locally | Added DAX reference resolution and dependency-cycle detection for measures and calculated columns/tables. |
+| Aug 31, 2026 | Phase 6.1-6.4 | Completed locally | Added Power Query/M extraction, source detection, physical-object mapping, and tested gateway/query mappings. |
+| Aug 31, 2026 | Phase 7 | Completed locally | Added canonical stable-ID nodes, edges, and end-to-end graph construction. |
+| Aug 31, 2026 | Phase 8 | Completed locally | Added downstream reverse-impact paths with depth limits. |
+| Aug 31, 2026 | Phase 9 | Completed locally | Added workspace/estate inventory, report/model bindings, and an estate graph. |
+| Aug 31, 2026 | Phase 10 | Completed locally | Added optional Snowflake SQL API and object-dependency normalization. |
+| Aug 31, 2026 | Phase 11-17 | Completed locally | Added unified APIs, search/navigation, TTL caching, scan jobs, SQLite versions, incremental diffs, and validation. |
+| Aug 31, 2026 | Phase 18-20 | Completed locally | Added configurable security controls, operational readiness, and Prometheus metrics. |
+| Deferred | Phase 21 | Not started by design | PowerAI remains excluded until backend and frontend workflows are complete. |
 
 The Phase 3.6-3.14 execution labels are retained for history. Against the
 original roadmap, they finish Phase 3 report-level lineage and implement Phase
-4 semantic model metadata. Phase 6.0 is a scoped gateway/datasource discovery
-addition; it does not complete the remaining Phase 6 physical-source work. The
-next numbered roadmap work remains Phase 5.1.
+4 semantic model metadata. The original roadmap numbering above is now the
+authoritative phase view; Phase 6.0 remains only a historical execution label.
 
 ### Latest Completed Phase
 
-Phase 6.0 is the latest completed local addition. It exposes the Power BI My
-workspace report-detail endpoint and gateway discovery/datasource metadata
-endpoints. It validates gateway/datasource identity before returning normalized
-connection metadata. TMDL remains the source-path authority for semantic-model
-definition evidence; XMLA contributes live runtime metadata.
+Phase 20 is the latest completed backend implementation phase. Phases 5 through
+20 are covered by service/API tests and retain the existing architecture rule
+that source evidence is preserved rather than silently overwritten.
 
 ### Next Phase
 
-Original Phase 5.1 - Measure DAX Parsing is the next implementation phase.
-
-Phase 6.1-6.4 remain pending. Phase 6.0 does not parse Power Query/M, detect
-physical sources, or map logical objects to physical objects.
+No PowerAI work starts next. The immediate work is live tenant acceptance,
+frontend integration, broader DAX/M fixture coverage, and replacing in-memory
+auth plus single-instance SQLite/job coordination before horizontal scaling.
 
 The Phase 3.14 implementation has a tenant-dependent acceptance check that is
 not part of local automated testing:
@@ -645,8 +818,8 @@ not part of local automated testing:
 
 ## Current Review Notes
 
-Phase 3.6 through Phase 3.14 are locally verified with Ruff and pytest. The
-only current test-suite warning is a third-party FastAPI/TestClient warning
+Phases 3.6 through 20 are locally verified with Ruff and pytest: 175 tests pass.
+The only known test-suite warning is a third-party FastAPI/TestClient warning
 about Starlette's `httpx` integration.
 
 ## Development Notes

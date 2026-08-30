@@ -8,6 +8,7 @@ from app.api.dependencies.credentials import (
 )
 from app.schemas.gateway import (
     GatewayDatasource,
+    GatewayDatasourceListResponse,
     GatewayListResponse,
 )
 from app.services.gateway_service import GatewayService
@@ -28,6 +29,25 @@ async def list_gateways(
     service = GatewayService()
 
     return await service.list_gateways(
+        access_token=access_token,
+    )
+
+
+@router.get(
+    "/{gateway_id}/datasources",
+    response_model=GatewayDatasourceListResponse,
+)
+async def list_gateway_datasources(
+    gateway_id: UUID,
+    access_token: Annotated[
+        str,
+        Depends(get_powerbi_access_token),
+    ],
+) -> GatewayDatasourceListResponse:
+    service = GatewayService()
+
+    return await service.list_datasources(
+        gateway_id=str(gateway_id),
         access_token=access_token,
     )
 

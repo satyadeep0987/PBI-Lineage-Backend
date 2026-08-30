@@ -107,3 +107,41 @@ async def test_get_gateway_datasource_uses_gateway_datasource_url(
         access_token="fake-token",
         not_found_resource="gateway datasource",
     )
+
+
+@pytest.mark.asyncio
+async def test_get_gateway_datasources_uses_gateway_collection_url(
+    monkeypatch,
+):
+    provider_get = AsyncMock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "value": [
+                    {
+                        "id": "datasource-1",
+                        "gatewayId": "gateway-1",
+                    }
+                ]
+            },
+        )
+    )
+    monkeypatch.setattr(
+        "app.clients.powerbi_client.provider_get",
+        provider_get,
+    )
+
+    result = await PowerBIClient().get_gateway_datasources(
+        gateway_id="gateway-1",
+        access_token="fake-token",
+    )
+
+    assert result[0]["id"] == "datasource-1"
+    provider_get.assert_awaited_once_with(
+        provider="powerbi",
+        url=(
+            "https://api.powerbi.com/v1.0/myorg/"
+            "gateways/gateway-1/datasources"
+        ),
+        access_token="fake-token",
+    )

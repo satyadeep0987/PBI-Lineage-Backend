@@ -220,6 +220,20 @@ class PowerBIClient:
             response
         )
 
+    async def get_gateway_datasources(
+        self,
+        *,
+        gateway_id: str,
+        access_token: str,
+    ) -> list[dict[str, Any]]:
+        response = await provider_get(
+            provider="powerbi",
+            url=f"{self.BASE_URL}/gateways/{gateway_id}/datasources",
+            access_token=access_token,
+        )
+
+        return self._parse_list_response(response)
+
 
     async def get_report_pages(
         self,

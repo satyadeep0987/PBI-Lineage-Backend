@@ -162,6 +162,7 @@ async def _provider_request(
     access_token: str,
     params: dict[str, Any] | None = None,
     json_body: dict[str, Any] | None = None,
+    additional_headers: dict[str, str] | None = None,
     not_found_resource: str | None = None,
 ) -> httpx.Response:
     headers = {
@@ -170,6 +171,9 @@ async def _provider_request(
         ),
         "Accept": "application/json",
     }
+
+    if additional_headers:
+        headers.update(additional_headers)
 
     request_kwargs: dict[
         str,
@@ -223,6 +227,7 @@ async def provider_get(
     url: str,
     access_token: str,
     params: dict[str, Any] | None = None,
+    additional_headers: dict[str, str] | None = None,
     not_found_resource: str | None = None,
 ) -> httpx.Response:
     return await _provider_request(
@@ -231,6 +236,7 @@ async def provider_get(
         url=url,
         access_token=access_token,
         params=params,
+        additional_headers=additional_headers,
         not_found_resource=(
             not_found_resource
         ),
@@ -244,6 +250,7 @@ async def provider_post(
     access_token: str,
     params: dict[str, Any] | None = None,
     json_body: dict[str, Any] | None = None,
+    additional_headers: dict[str, str] | None = None,
     not_found_resource: str | None = None,
 ) -> httpx.Response:
     return await _provider_request(
@@ -253,6 +260,7 @@ async def provider_post(
         access_token=access_token,
         params=params,
         json_body=json_body,
+        additional_headers=additional_headers,
         not_found_resource=(
             not_found_resource
         ),

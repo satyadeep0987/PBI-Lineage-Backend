@@ -6,6 +6,7 @@ from app.schemas.gateway import (
     Gateway,
     GatewayDatasource,
     GatewayDatasourceCredentialDetails,
+    GatewayDatasourceListResponse,
     GatewayListResponse,
     GatewayPublicKey,
 )
@@ -48,6 +49,31 @@ class GatewayService:
             raw_datasource,
             gateway_id=gateway_id,
             datasource_id=datasource_id,
+        )
+
+    async def list_datasources(
+        self,
+        *,
+        gateway_id: str,
+        access_token: str,
+    ) -> GatewayDatasourceListResponse:
+        raw_datasources = await self.client.get_gateway_datasources(
+            gateway_id=gateway_id,
+            access_token=access_token,
+        )
+        datasources = [
+            self._map_datasource(
+                datasource,
+                gateway_id=gateway_id,
+                datasource_id=self._required_text(datasource, "id"),
+            )
+            for datasource in raw_datasources
+        ]
+
+        return GatewayDatasourceListResponse(
+            gateway_id=gateway_id,
+            datasources=datasources,
+            count=len(datasources),
         )
 
     @staticmethod
