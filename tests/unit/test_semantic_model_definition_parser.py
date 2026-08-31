@@ -215,6 +215,88 @@ relationship SalesCustomer
     )
 
 
+def test_parse_tmdl_relationship_dot_references():
+    raw = _raw_definition(
+        text="""
+relationship SalesCustomer
+    fromColumn: 'Sales Data'.'Customer Id'
+    toColumn: Customer.CustomerId
+"""
+    )
+
+    result = SemanticModelDefinitionParser().parse(raw)
+
+    relationship = result.relationships[0]
+    assert relationship.from_table == "Sales Data"
+    assert relationship.from_column == "Customer Id"
+    assert relationship.to_table == "Customer"
+    assert relationship.to_column == "CustomerId"
+
+
+def test_parse_tmdl_power_query_partition():
+    raw = _raw_definition(
+        text="""
+table Sales
+    partition Sales = m
+        mode: import
+        source =
+            let
+                Source = Sql.Database("sql.example.com", "warehouse"),
+                Orders = Source{[Schema="dbo",Item="Sales"]}[Data]
+            in
+                Orders
+"""
+    )
+
+    result = SemanticModelDefinitionParser().parse(raw)
+
+    partition = result.tables[0].partitions[0]
+
+    assert partition.name == "Sales"
+    assert partition.mode == "import"
+    assert partition.source_type == "m"
+    assert partition.expression == (
+        "let\n"
+        'Source = Sql.Database("sql.example.com", "warehouse"),\n'
+        'Orders = Source{[Schema="dbo",Item="Sales"]}[Data]\n'
+        "in\n"
+        "Orders"
+    )
+    assert partition.source_path == "definition/tables/Sales.tmdl"
+
+
+def test_parse_tmdl_calculated_column_and_table_partition_dax():
+    raw = _raw_definition(
+        text="""
+table Sales
+    column Amount
+
+table Summary
+    column DoubleAmount = Sales[Amount] * 2
+    partition Summary = calculated
+        mode: import
+        source =
+            SUMMARIZE(
+                Sales,
+                Sales[Amount]
+            )
+"""
+    )
+
+    result = SemanticModelDefinitionParser().parse(raw)
+
+    summary = result.tables[1]
+    assert summary.columns[0].name == "DoubleAmount"
+    assert summary.columns[0].expression == "Sales[Amount] * 2"
+    assert summary.partitions[0].source_type == "calculated"
+    assert summary.expression == (
+        "SUMMARIZE(\n"
+        "Sales,\n"
+        "Sales[Amount]\n"
+        ")"
+    )
+
+
 def test_invalid_base64_adds_warning():
     raw = SemanticModelDefinitionResponse(
         workspace_id="workspace-123",

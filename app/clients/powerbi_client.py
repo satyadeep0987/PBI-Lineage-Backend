@@ -165,6 +165,75 @@ class PowerBIClient:
             response
         )
 
+    async def get_report_in_my_workspace(
+        self,
+        *,
+        report_id: str,
+        access_token: str,
+    ) -> dict[str, Any]:
+        response = await provider_get(
+            provider="powerbi",
+            url=(
+                f"{self.BASE_URL}/reports/{report_id}"
+            ),
+            access_token=access_token,
+            not_found_resource="report",
+        )
+
+        return self._parse_object_response(
+            response
+        )
+
+    async def get_gateways(
+        self,
+        *,
+        access_token: str,
+    ) -> list[dict[str, Any]]:
+        response = await provider_get(
+            provider="powerbi",
+            url=f"{self.BASE_URL}/gateways",
+            access_token=access_token,
+        )
+
+        return self._parse_list_response(
+            response
+        )
+
+    async def get_gateway_datasource(
+        self,
+        *,
+        gateway_id: str,
+        datasource_id: str,
+        access_token: str,
+    ) -> dict[str, Any]:
+        response = await provider_get(
+            provider="powerbi",
+            url=(
+                f"{self.BASE_URL}/gateways/{gateway_id}/"
+                f"datasources/{datasource_id}"
+            ),
+            access_token=access_token,
+            not_found_resource="gateway datasource",
+        )
+
+        return self._parse_object_response(
+            response
+        )
+
+    async def get_gateway_datasources(
+        self,
+        *,
+        gateway_id: str,
+        access_token: str,
+    ) -> list[dict[str, Any]]:
+        response = await provider_get(
+            provider="powerbi",
+            url=f"{self.BASE_URL}/gateways/{gateway_id}/datasources",
+            access_token=access_token,
+        )
+
+        return self._parse_list_response(response)
+
 
     async def get_report_pages(
         self,

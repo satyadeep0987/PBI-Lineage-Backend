@@ -7,6 +7,7 @@ from app.schemas.parsed_semantic_model import (
     ParsedSemanticModelHierarchy,
     ParsedSemanticModelHierarchyLevel,
     ParsedSemanticModelMeasure,
+    ParsedSemanticModelPartition,
     ParsedSemanticModelRelationship,
     ParsedSemanticModelResponse,
     ParsedSemanticModelTable,
@@ -16,6 +17,10 @@ from app.schemas.semantic_model_definition import SemanticModelDefinitionRespons
 
 FIELD_REFERENCE_PATTERN = re.compile(
     r"^'?(?P<table>[^'\[]+)'?\[(?P<field>[^\]]+)\]$"
+)
+TMDL_FIELD_REFERENCE_PATTERN = re.compile(
+    r"^(?P<table>'(?:[^']|'')+'|[^.]+)\."
+    r"(?P<field>'(?:[^']|'')+'|[^.]+)$"
 )
 
 PROPERTY_KEY_PATTERN = re.compile(
@@ -88,7 +93,9 @@ class SemanticModelDefinitionParser:
         current_column = None
         current_measure = None
         current_hierarchy = None
+        current_partition = None
         current_relationship = None
+        partition_source_started = False
 
         for raw_line in text.splitlines():
             line = raw_line.strip()
@@ -97,17 +104,24 @@ class SemanticModelDefinitionParser:
                 continue
 
             if line.startswith("table "):
+                declaration = line.removeprefix("table ")
+                table_name, expression = self._split_assignment(declaration)
+                if "=" in declaration and expression is None:
+                    expression = ""
                 current_table = ParsedSemanticModelTable(
                     name=self._clean_name(
-                        line.removeprefix("table ")
+                        table_name
                     ),
                     source_path=source_path,
+                    expression=expression,
                 )
                 result.tables.append(current_table)
                 current_column = None
                 current_measure = None
                 current_hierarchy = None
+                current_partition = None
                 current_relationship = None
+                partition_source_started = False
                 continue
 
             if line.startswith("relationship"):
@@ -127,18 +141,25 @@ class SemanticModelDefinitionParser:
                 current_column = None
                 current_measure = None
                 current_hierarchy = None
+                current_partition = None
+                partition_source_started = False
                 continue
 
             if current_table and line.startswith("column "):
+                declaration = line.removeprefix("column ")
+                column_name, expression = self._split_assignment(declaration)
+                if "=" in declaration and expression is None:
+                    expression = ""
                 current_column = ParsedSemanticModelColumn(
-                    name=self._clean_name(
-                        line.removeprefix("column ")
-                    ),
+                    name=self._clean_name(column_name),
                     source_path=source_path,
+                    expression=expression,
                 )
                 current_table.columns.append(current_column)
                 current_measure = None
                 current_hierarchy = None
+                current_partition = None
+                partition_source_started = False
                 continue
 
             if current_table and line.startswith("measure "):
@@ -153,6 +174,8 @@ class SemanticModelDefinitionParser:
                 current_table.measures.append(current_measure)
                 current_column = None
                 current_hierarchy = None
+                current_partition = None
+                partition_source_started = False
                 continue
 
             if current_table and line.startswith("hierarchy "):
@@ -165,6 +188,24 @@ class SemanticModelDefinitionParser:
                 current_table.hierarchies.append(current_hierarchy)
                 current_column = None
                 current_measure = None
+                current_partition = None
+                partition_source_started = False
+                continue
+
+            if current_table and line.startswith("partition "):
+                name, source_type = self._split_assignment(
+                    line.removeprefix("partition ").strip()
+                )
+                current_partition = ParsedSemanticModelPartition(
+                    name=self._clean_name(name),
+                    source_path=source_path,
+                    source_type=source_type,
+                )
+                current_table.partitions.append(current_partition)
+                current_column = None
+                current_measure = None
+                current_hierarchy = None
+                partition_source_started = False
                 continue
 
             if current_hierarchy and line.startswith("level "):
@@ -180,7 +221,26 @@ class SemanticModelDefinitionParser:
 
             key, value = self._split_property(line)
 
-            if current_column:
+            if current_partition:
+                if key == "mode" and not partition_source_started:
+                    current_partition.mode = value
+                elif key == "source":
+                    current_partition.expression = value
+                    partition_source_started = True
+                    self._apply_calculated_partition(
+                        current_table,
+                        current_partition,
+                    )
+                elif partition_source_started:
+                    current_partition.expression = self._append_expression(
+                        current_partition.expression,
+                        line,
+                    )
+                    self._apply_calculated_partition(
+                        current_table,
+                        current_partition,
+                    )
+            elif current_column:
                 applied = self._apply_column_property(
                     current_column,
                     key,
@@ -227,6 +287,15 @@ class SemanticModelDefinitionParser:
                     )
             elif current_relationship:
                 self._apply_relationship_property(current_relationship, key, value)
+            elif (
+                current_table
+                and current_table.expression is not None
+                and not self._looks_like_property_key(key)
+            ):
+                current_table.expression = self._append_expression(
+                    current_table.expression,
+                    line,
+                )
 
     @staticmethod
     def _split_assignment(value: str) -> tuple[str, str | None]:
@@ -315,6 +384,9 @@ class SemanticModelDefinitionParser:
         )
 
         if not match:
+            match = TMDL_FIELD_REFERENCE_PATTERN.match(value.strip())
+
+        if not match:
             return None, None
 
         return (
@@ -396,3 +468,14 @@ class SemanticModelDefinitionParser:
             relationship.cardinality = value
         elif key in {"crossFilteringBehavior", "crossFilterDirection"}:
             relationship.cross_filter_direction = value
+
+    @staticmethod
+    def _apply_calculated_partition(
+        table: ParsedSemanticModelTable | None,
+        partition: ParsedSemanticModelPartition,
+    ) -> None:
+        if (
+            table is not None
+            and (partition.source_type or "").casefold() == "calculated"
+        ):
+            table.expression = partition.expression

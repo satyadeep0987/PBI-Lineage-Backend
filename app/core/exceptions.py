@@ -262,3 +262,52 @@ class ProviderResourceNotFoundError(AppException):
             status_code=status.HTTP_404_NOT_FOUND,
             provider=provider,
         )
+
+
+class ProviderAuthenticationFailedError(AppException):
+    def __init__(self, provider: str) -> None:
+        super().__init__(
+            code="AUTH_PROVIDER_FAILED",
+            message=(
+                f"{_provider_label(provider)} authentication failed. "
+                "Verify the account, identity, authenticator, and assigned role."
+            ),
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            provider=provider,
+        )
+
+
+class ResourceNotFoundError(AppException):
+    def __init__(self, resource: str) -> None:
+        super().__init__(
+            code="RESOURCE_NOT_FOUND",
+            message=f"The requested {resource} was not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+
+class InvalidLineageRequestError(AppException):
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            code="LINEAGE_REQUEST_INVALID",
+            message=message,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class LineageApiKeyRequiredError(AppException):
+    def __init__(self) -> None:
+        super().__init__(
+            code="LINEAGE_API_KEY_REQUIRED",
+            message="A lineage administration API key is required.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+
+class LineageApiKeyInvalidError(AppException):
+    def __init__(self) -> None:
+        super().__init__(
+            code="LINEAGE_API_KEY_INVALID",
+            message="The lineage administration API key is invalid.",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )

@@ -60,3 +60,6 @@ README.md
 /local_fastapi_auth_test/
 PROJECT_CONTEXT.md
 REF_DOC/
+
+# Generated ECS deployment files
+deploy/ecs/task-definition.json

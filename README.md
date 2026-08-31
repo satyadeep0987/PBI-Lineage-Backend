@@ -1,8 +1,8 @@
 # PBI Lineage Backend
 
-Standalone FastAPI backend for Power BI and Microsoft Fabric metadata discovery,
-report definition retrieval, PBIR normalization, and future lineage/impact
-analysis.
+Standalone FastAPI backend for Power BI, Microsoft Fabric, and optional
+Snowflake metadata discovery, report definition retrieval, PBIR normalization,
+physical-source discovery, lineage graph construction, and impact analysis.
 
 This backend is being split out from the original Streamlit-based PBI Lineage
 Explorer so the application can evolve into a cleaner service-oriented
@@ -18,9 +18,13 @@ Current capabilities:
 - Gets one Power BI workspace.
 - Lists Power BI reports in a workspace.
 - Gets one Power BI report.
+- Gets one report from the authenticated user's My workspace.
 - Lists report pages.
 - Gets one report page.
 - Lists Power BI semantic models/datasets in a workspace.
+- Lists Power BI gateways for which the authenticated user is an administrator.
+- Gets connection metadata for one datasource on an accessible Power BI gateway.
+- Lists datasources on an accessible Power BI gateway.
 - Retrieves Fabric report definitions.
 - Decodes and normalizes PBIR report definitions.
 - Extracts visual titles, visual positions, visual types, page metadata, and
@@ -29,7 +33,7 @@ Current capabilities:
   filters, and projections.
 - Retrieves Fabric semantic model definitions in TMDL/TMSL format.
 - Parses TMDL semantic model definitions into tables, columns, measures,
-  relationships, and hierarchies.
+  relationships, hierarchies, calculated tables, and Power Query partitions.
 - Carries semantic model source-path evidence into lineage matches.
 - Extracts XMLA semantic model metadata through an ADODB COM/MSOLAP adapter
   when the host has the Analysis Services OLE DB provider configured.
@@ -41,19 +45,53 @@ Current capabilities:
 - Validates Fabric report definition formats separately from semantic model
   definition formats.
 - Surfaces provider error details for Fabric request and operation failures.
-- Has a locally validated Windows production container image with COM, ADODB,
-  and MSOLAP available at runtime.
+- Runs in a deployed Windows container environment with COM, ADODB, and MSOLAP
+  available at runtime.
+- Is publicly hosted over HTTPS through Cloudflare DNS, an AWS Application Load
+  Balancer, and a private Windows ECS task.
+- Parses measure, calculated-column, and calculated-table DAX references and
+  reports unresolved references and dependency cycles.
+- Extracts supported Power Query/M connectors, native SQL objects, navigation
+  targets, files, URLs, storage accounts, and query-to-source mappings.
+- Parses an allowlisted, non-secret subset of gateway `connectionDetails` and
+  matches gateway datasources to detected query sources.
+- Builds canonical upstream-to-downstream lineage graphs spanning physical
+  sources, queries, semantic objects, DAX dependencies, and report visuals.
+- Provides reverse impact, graph search, and upstream/downstream navigation.
+- Discovers workspace-level report/semantic-model inventory and bindings.
+- Authenticates live Snowflake connector sessions with password/MFA, in-memory
+  RSA private keys, external-browser SSO for interactive local hosts, or OAuth.
+- Traces Snowflake table or column lineage beyond the provider's five-level
+  `SNOWFLAKE.CORE.GET_LINEAGE` call limit by expanding boundary objects in
+  bounded parallel waves. The supplied procedure logic runs in the backend;
+  no stored procedure is installed in a customer account.
+- Retains the earlier optional Snowflake SQL API path for normalizing
+  `ACCOUNT_USAGE.OBJECT_DEPENDENCIES` evidence supplied with a bearer token.
+- Persists versioned graph snapshots in SQLite, detects incremental changes,
+  caches graph reads, runs asynchronous scan jobs, and validates lineage quality.
+- Builds synchronous or asynchronous live lineage scans from workspace/model
+  IDs and an optional report ID using the current Fabric and Power BI session.
+  Provider tokens stay in process memory and are never written to scan-job
+  payloads or graph storage.
+- Provides configurable API-key enforcement, secure headers/cookies, trusted
+  hosts, request-size limits, readiness checks, and Prometheus-format metrics.
 
-Future capabilities:
+Remaining acceptance and scale work:
 
 - Improve semantic model parser coverage for more TMDL shapes.
 - Run live XMLA acceptance validation against a Power BI/Fabric capacity.
-- Add Snowflake lineage.
-- Add impact analysis APIs.
+- Run live Snowflake authentication and deep-lineage acceptance with a role
+  permitted to call `SNOWFLAKE.CORE.GET_LINEAGE`.
 - Add production-grade auth/session storage.
-- Add observability and caching.
-- Publish the verified Windows image to Amazon ECR and deploy it to compatible
-  AWS Windows compute.
+- Move lineage persistence and scan coordination to shared infrastructure before
+  running multiple API workers/tasks.
+- Expand DAX and Power Query grammar coverage with tenant-derived fixtures.
+- Automate ECS task-definition registration and service rollout after an
+  immutable Amazon ECR image is published.
+- Add production high availability, alarms, and autoscaling.
+
+PowerAI is intentionally deferred until the backend and frontend lineage
+workflows are complete. No PowerAI endpoint or service is included in this phase.
 
 ## Technology Stack
 
@@ -62,10 +100,16 @@ Future capabilities:
 - Pydantic / Pydantic Settings
 - httpx
 - MSAL
+- Snowflake Connector for Python
+- cryptography for in-memory RSA key loading
 - uv
 - pytest / pytest-asyncio
 - ruff
 - Windows Docker Engine / Windows Server Core LTSC 2025
+- Amazon ECR, ECS EC2 (Windows Server 2025), Application Load Balancer, and
+  CloudWatch Logs
+- GitHub Actions with OIDC and a dedicated Windows self-hosted build runner
+- Cloudflare DNS and AWS Certificate Manager
 
 ## Quick Start
 
@@ -126,11 +170,45 @@ docker run --rm `
 ```
 
 The image starts Uvicorn on `0.0.0.0:8000` with one worker. One worker is
-intentional until the in-memory Microsoft authentication session state is moved
-to shared storage. Local production-image build and container runtime validation
-completed successfully on Windows Server 2025. Confirm health through
-`/api/v1/health`, `/api/v1/health/live`, and `/api/v1/health/ready` before an
-external deployment.
+intentional until the in-memory Microsoft authentication state and live
+Snowflake connector-session ownership are redesigned for shared/multi-worker
+operation. Local production-image build and container runtime validation
+completed successfully on Windows Server 2025, and the image is now deployed
+on AWS Windows ECS capacity.
+
+### Hosted AWS Deployment
+
+The public backend is available at `https://api.<domain>`. The root domain is
+intentionally separate so it can host a future frontend.
+
+```text
+Cloudflare DNS
+  -> AWS Application Load Balancer HTTPS :443
+  -> private ECS Windows task HTTP :8000
+  -> FastAPI
+```
+
+- AWS Region: `ap-south-1`.
+- The ECR repository stores immutable images tagged with the full Git SHA.
+- The ECS service uses Windows Server 2025 EC2 capacity, `awsvpc` networking,
+  and private task IPs. Port `8000` is reachable only from the load balancer
+  security group.
+- The load balancer redirects HTTP `:80` to HTTPS `:443`; its target group uses
+  `GET /api/v1/health` as the health check.
+- GitHub Actions authenticates to AWS with OIDC and builds Windows images on a
+  dedicated self-hosted Windows runner. ECR build/push is operational; automatic
+  ECS rollout after the push is the remaining CI/CD automation step.
+
+Check the hosted service:
+
+```text
+https://api.<domain>/api/v1/health
+https://api.<domain>/docs
+```
+
+Deployment architecture, operational procedures, and recovery guidance are in
+[`REF_DOC/PBI-Lineage-Backend-Deployment-Context.md`](REF_DOC/PBI-Lineage-Backend-Deployment-Context.md)
+and [`REF_DOC/PBI-Lineage-Backend-AWS-Deployment-Runbook.md`](REF_DOC/PBI-Lineage-Backend-AWS-Deployment-Runbook.md).
 
 ## Environment
 
@@ -144,7 +222,33 @@ API_V1_PREFIX=/api/v1
 LOG_LEVEL=INFO
 XMLA_TENANT_NAME=myorg
 XMLA_PROVIDER=MSOLAP
+LINEAGE_DATABASE_PATH=data/lineage.db
+LINEAGE_CACHE_TTL_SECONDS=30
+LINEAGE_CACHE_MAX_ENTRIES=128
+LINEAGE_SCAN_MAX_CONCURRENCY=2
+SNOWFLAKE_SESSION_MAX_AGE_SECONDS=2700
+SNOWFLAKE_ALLOW_EXTERNAL_BROWSER_AUTH=false
+CORS_ALLOWED_ORIGINS=[]
+ALLOWED_HOSTS=["*"]
+FORCE_HTTPS=false
+ENABLE_API_DOCS=true
+AUTH_COOKIE_SECURE=false
+AUTH_COOKIE_SAMESITE=lax
+MAX_REQUEST_BODY_BYTES=10485760
+EXPOSE_METRICS=true
 ```
+
+For production, set `AUTH_COOKIE_SECURE=true`, configure explicit
+`ALLOWED_HOSTS`, provide `LINEAGE_ADMIN_API_KEY`, and normally disable API docs.
+`CORS_ALLOWED_ORIGINS` and `ALLOWED_HOSTS` use JSON-list syntax in environment
+variables. SQLite and the in-process scan scheduler match the current
+single-worker deployment; move both to shared infrastructure before scaling to
+multiple workers or tasks.
+
+Snowflake connector sessions are also process-local and default to a 45-minute
+maximum age. Keep `SNOWFLAKE_ALLOW_EXTERNAL_BROWSER_AUTH=false` on hosted
+runtimes: the connector opens the browser on the backend host, not in the API
+caller's browser. Use OAuth or key-pair authentication for unattended hosting.
 
 XMLA live extraction requires a Windows host with `pywin32` and the Microsoft
 Analysis Services OLE DB Provider (`MSOLAP`) installed. The backend opens an
@@ -163,6 +267,7 @@ All endpoints are mounted under `/api/v1`.
 GET /api/v1/health
 GET /api/v1/health/live
 GET /api/v1/health/ready
+GET /api/v1/health/metrics
 ```
 
 ### Authentication
@@ -172,6 +277,9 @@ POST /api/v1/auth/microsoft/device/start
 GET  /api/v1/auth/microsoft/device/status
 GET  /api/v1/auth/microsoft/device/{session_id}/status
 POST /api/v1/auth/microsoft/device/logout
+POST /api/v1/auth/snowflake/session
+GET  /api/v1/auth/snowflake/session/status
+DELETE /api/v1/auth/snowflake/session
 ```
 
 Device auth status is intended to show:
@@ -184,6 +292,10 @@ Device auth status is intended to show:
 - Missing scopes.
 - Provider error code.
 
+The Snowflake routes create, inspect, and close a separate HttpOnly session
+cookie named `pbi_lineage_snowflake_session`. They do not reuse the Microsoft
+Power BI/Fabric session.
+
 ### Power BI Metadata
 
 ```text
@@ -194,7 +306,209 @@ GET /api/v1/workspaces/{workspace_id}/reports/{report_id}
 GET /api/v1/workspaces/{workspace_id}/reports/{report_id}/pages
 GET /api/v1/workspaces/{workspace_id}/reports/{report_id}/pages/{page_name}
 GET /api/v1/workspaces/{workspace_id}/semantic-models
+GET /api/v1/reports/{report_id}
 ```
+
+`GET /api/v1/reports/{report_id}` uses the Power BI **My workspace** endpoint.
+It is distinct from the existing workspace-scoped report route.
+
+### Power BI Gateways
+
+```text
+GET /api/v1/gateways
+GET /api/v1/gateways/{gateway_id}/datasources
+GET /api/v1/gateways/{gateway_id}/datasources/{datasource_id}
+```
+
+Gateway endpoints require a Power BI token with `Dataset.Read.All` or
+`Dataset.ReadWrite.All`, and the authenticated user must be a gateway admin.
+Virtual network gateways are not supported by these Power BI APIs. Datasource
+responses preserve connection metadata and credential type, but never expose
+credential values.
+
+### Unified Lineage
+
+```text
+POST /api/v1/lineage/dax/analyze
+POST /api/v1/lineage/physical-sources/analyze
+POST /api/v1/lineage/snowflake/normalize
+POST /api/v1/lineage/snowflake/discover
+POST /api/v1/lineage/snowflake/trace
+POST /api/v1/lineage/graphs
+POST /api/v1/lineage/live-graphs
+GET  /api/v1/lineage/graphs/{graph_id}
+GET  /api/v1/lineage/graphs/{graph_id}/versions
+GET  /api/v1/lineage/graphs/{graph_id}/impact/{node_id}
+GET  /api/v1/lineage/graphs/{graph_id}/search
+GET  /api/v1/lineage/graphs/{graph_id}/navigate/{node_id}
+GET  /api/v1/lineage/graphs/{graph_id}/changes
+GET  /api/v1/lineage/graphs/{graph_id}/validate
+GET  /api/v1/lineage/estate/discover
+POST /api/v1/lineage/scan-jobs
+POST /api/v1/lineage/scan-jobs/live
+GET  /api/v1/lineage/scan-jobs/{job_id}
+```
+
+Graph edges use upstream-to-downstream direction. Containment and semantic-model
+relationship edges are marked as non-lineage so downstream impact traversals do
+not confuse ownership structure with data flow. Re-saving unchanged graph
+content does not create a new version; changed content receives the next SQLite
+snapshot version and can be compared through the `changes` endpoint.
+
+When `LINEAGE_ADMIN_API_KEY` is configured, every `/lineage` endpoint requires
+the `X-Lineage-Admin-Key` header. Power BI estate discovery additionally uses
+the existing authenticated Microsoft session. Gateway `connectionDetails`
+parsing is restricted to an allowlist of endpoint metadata and never includes
+credential values.
+
+`live-graphs` retrieves parsed Fabric TMDL, optionally retrieves and matches a
+report definition, and optionally enriches Power Query sources with accessible
+gateway datasource metadata. `scan-jobs/live` runs the same pipeline in the
+bounded background-job manager. Neither endpoint persists provider tokens.
+The older `/snowflake/discover` route accepts its short-lived credential only
+through the `Authorization: Bearer` header and reads
+`ACCOUNT_USAGE.OBJECT_DEPENDENCIES` through the Snowflake SQL API. The new
+`/snowflake/trace` route uses the authenticated connector session cookie and
+calls `SNOWFLAKE.CORE.GET_LINEAGE` for table/column lineage.
+
+### Snowflake Authentication And Deep Lineage
+
+Snowflake authentication and every lineage route are protected by
+`X-Lineage-Admin-Key` when `LINEAGE_ADMIN_API_KEY` is configured. Send
+credentials only over HTTPS. Request bodies, passwords, tokens, private keys,
+and passphrases are not copied into session metadata, logs, persistence, or the
+API response. Authentication material exists only in request memory and any
+private in-memory state retained by the live Snowflake connector connection.
+
+Common optional connection fields for every method are `warehouse`, `database`,
+`schema_name`, and `role`. `account_identifier` is the connector account value,
+such as `organization-account`; do not send a full Snowflake URL.
+
+Password authentication:
+
+```json
+{
+  "authentication_method": "password",
+  "account_identifier": "organization-account",
+  "user": "LINEAGE_USER",
+  "password": "<password>",
+  "authenticator": "snowflake",
+  "warehouse": "LINEAGE_WH",
+  "role": "LINEAGE_READER"
+}
+```
+
+For username/password MFA, set `authenticator` to
+`username_password_mfa`. Supply `passcode` separately or set
+`passcode_in_password=true` when the passcode is appended to the password.
+
+RSA key-pair authentication accepts PKCS#8 or PKCS#1 PEM text. Escaped `\n`
+newlines are normalized, encrypted keys use `private_key_passphrase`, and the
+key is converted to unencrypted PKCS#8 DER only in process memory for the
+Snowflake connector:
+
+```json
+{
+  "authentication_method": "key_pair",
+  "account_identifier": "organization-account",
+  "user": "LINEAGE_USER",
+  "private_key_pem": "-----BEGIN ENCRYPTED PRIVATE KEY-----\n...\n-----END ENCRYPTED PRIVATE KEY-----",
+  "private_key_passphrase": "<passphrase>",
+  "warehouse": "LINEAGE_WH",
+  "role": "LINEAGE_READER"
+}
+```
+
+External-browser SSO is intended only for an interactive local backend and must
+be explicitly enabled with `SNOWFLAKE_ALLOW_EXTERNAL_BROWSER_AUTH=true`:
+
+```json
+{
+  "authentication_method": "external_browser",
+  "account_identifier": "organization-account",
+  "user": "LINEAGE_USER",
+  "warehouse": "LINEAGE_WH",
+  "role": "LINEAGE_READER"
+}
+```
+
+OAuth is the external/unattended option for a hosted API:
+
+```json
+{
+  "authentication_method": "oauth",
+  "account_identifier": "organization-account",
+  "user": "LINEAGE_USER",
+  "token": "<snowflake-oauth-access-token>",
+  "warehouse": "LINEAGE_WH",
+  "role": "LINEAGE_READER"
+}
+```
+
+On successful connection, the backend runs a current-account/user/role/context
+query, stores only the live connection plus sanitized identity metadata, and
+sets the HttpOnly cookie. Re-authentication closes the previous cookie's
+connection. Logout, expiry, or graceful application shutdown also closes the
+connection; logout defers connection closure until an active trace finishes.
+
+Trace one table:
+
+```json
+{
+  "object_name": "ANALYTICS.PUBLIC.SALES",
+  "direction": "UPSTREAM",
+  "max_depth": 50,
+  "max_concurrency": 8
+}
+```
+
+Trace one column by adding `column_name`; `object_domain` is inferred as
+`COLUMN` and must not conflict if explicitly supplied:
+
+```json
+{
+  "object_name": "ANALYTICS.PUBLIC.SALES",
+  "column_name": "NET_AMOUNT",
+  "direction": "UPSTREAM",
+  "max_depth": 50,
+  "max_concurrency": 8,
+  "max_nodes": 5000,
+  "max_edges": 10000,
+  "max_queries": 2000,
+  "include_process": true
+}
+```
+
+The service calls `GET_LINEAGE` with at most five levels. Every object returned
+at the five-level boundary becomes a new frontier root; independent roots in a
+frontier are queried concurrently up to `max_concurrency`. Stable IDs, visited
+roots, and edge deduplication prevent repeated work and cycles. `max_depth`,
+`max_nodes`, `max_edges`, and `max_queries` bound each request. A failed root
+query fails the request; a failed deeper branch returns the partial snapshot
+with `truncated=true` and a `SNOWFLAKE_LINEAGE_BRANCH_FAILED` warning. Returned
+`PROCESS` evidence is retained when `include_process=true`.
+
+This ports the supplied procedure's recursive five-level traversal into the
+service and supports both table and column roots. It does not create or call
+`TRACE_COLUMN_LINEAGE` in Snowflake. The procedure's heuristic `GET_DDL` and
+query-history fallback for `COLUMN_TRANSFORMATION`/`MODIFICATION_SQL` is not
+executed: that path requires broader history privileges, can disclose SQL text,
+and is less authoritative than `GET_LINEAGE`. If Snowflake returns no lineage,
+the API returns the root with no inferred edges instead of guessing.
+
+`GET_LINEAGE` is a Snowflake Enterprise Edition feature and each authenticated
+role still needs access to the relevant objects; inaccessible objects produce a
+Snowflake error.
+The backend uses the Python connector directly because Snowpark sessions use
+the same connector authentication mechanisms and this integration executes SQL
+only; `snowflake-snowpark-python` is not required.
+
+References:
+
+- [Snowpark session creation](https://docs.snowflake.com/en/developer-guide/snowpark/python/creating-session)
+- [Snowpark Python setup](https://docs.snowflake.com/en/developer-guide/snowpark/python/setup)
+- [Snowflake Connector authentication](https://docs.snowflake.com/en/developer-guide/python-connector/python-connector-connect)
+- [`SNOWFLAKE.CORE.GET_LINEAGE`](https://docs.snowflake.com/en/sql-reference/functions/get_lineage-snowflake-core)
 
 ### Fabric Definitions
 
@@ -275,6 +589,7 @@ app/
   clients/
   core/
   domain/
+  repositories/
   schemas/
   services/
   utils/
@@ -290,30 +605,50 @@ tests/
 Application factory and FastAPI entrypoint. It configures:
 
 - App metadata.
-- CORS middleware.
+- Explicit CORS and trusted-host middleware.
+- Optional HTTPS redirects.
+- Security headers and request-body limits.
+- HTTP metrics and structured request logging.
 - Request logging middleware.
 - Request ID middleware.
 - Exception handlers.
 - API router mounting.
+- Graceful closure of live Snowflake connector sessions on shutdown.
 
 ### `app/api`
 
 FastAPI routing layer.
 
 - `app/api/router.py`
-  - Combines all v1 routers under health, auth, and workspaces.
+  - Combines all v1 routers under health, Microsoft/Snowflake auth, workspaces,
+    reports, gateways, and lineage.
 - `app/api/v1/health.py`
   - Health, liveness, and readiness endpoints.
 - `app/api/v1/auth.py`
   - Microsoft device auth start/status/logout endpoints.
   - In-progress scope diagnostics for Power BI and Fabric status.
+- `app/api/v1/snowflake_auth.py`
+  - Password/MFA, RSA key-pair, external-browser, and OAuth Snowflake session
+    authentication plus cookie status/logout.
 - `app/api/v1/workspaces.py`
   - Workspace, report, page, semantic model, report definition, normalized
     report definition, semantic model definition, semantic metadata,
     semantic lineage, and XMLA metadata endpoints.
+- `app/api/v1/reports.py`
+  - My workspace Power BI report-detail endpoint.
+- `app/api/v1/gateways.py`
+  - Gateway discovery plus gateway datasource list/detail endpoints.
+- `app/api/v1/lineage.py`
+  - Unified DAX, physical-source, Snowflake normalization, supplied-evidence
+    and live graph, deep Snowflake table/column tracing, impact, search,
+    navigation, versioning, validation, estate, and scan-job endpoints.
 - `app/api/dependencies/credentials.py`
-  - FastAPI dependencies for extracting Power BI and Fabric access tokens from
-    the auth session cookie.
+  - FastAPI dependencies for extracting Power BI/Fabric credentials and the
+    Snowflake connector-session ID from their separate HttpOnly cookies.
+- `app/api/dependencies/lineage.py`
+  - Singleton lineage repository, cache/store, and scan-manager dependencies.
+- `app/api/dependencies/security.py`
+  - Optional constant-time lineage administration API-key enforcement.
 
 ### `app/clients`
 
@@ -324,7 +659,8 @@ should not contain business normalization logic.
   - Shared HTTP behavior, provider error mapping, and upstream error-detail
     extraction.
 - `powerbi_client.py`
-  - Power BI REST API client.
+  - Power BI REST API client for workspace resources, My workspace report
+    detail, gateways, and gateway datasources.
 - `fabric_client.py`
   - Microsoft Fabric API client.
   - Handles report and semantic model definition endpoints and long-running
@@ -340,7 +676,15 @@ should not contain business normalization logic.
   - Raises a configured integration error when Windows COM, `pywin32`, or
     `MSOLAP` is unavailable.
 - `snowflake_client.py`
-  - Placeholder for future Snowflake integration.
+  - Optional Snowflake SQL API client for
+    `SNOWFLAKE.ACCOUNT_USAGE.OBJECT_DEPENDENCIES`, including asynchronous
+    statement polling and OAuth/key-pair token-type headers.
+- `snowflake_session_client.py`
+  - Creates and validates connector sessions for password/MFA, in-memory RSA
+    key-pair, local external-browser, and OAuth authentication.
+- `snowflake_lineage_query_client.py`
+  - Executes parameter-bound `SNOWFLAKE.CORE.GET_LINEAGE` queries and maps
+    table/column edges plus `PROCESS` evidence.
 
 ### `app/core`
 
@@ -348,7 +692,8 @@ Cross-cutting application infrastructure.
 
 - `config.py`
   - Environment-backed settings.
-  - Includes XMLA tenant and OLE DB provider settings.
+  - Includes XMLA settings plus Snowflake session lifetime and guarded
+    external-browser enablement.
 - `auth_session.py`
   - Auth cookie name and max-age constants.
 - `microsoft_auth.py`
@@ -366,7 +711,17 @@ Cross-cutting application infrastructure.
 - `request_logging.py`
   - Structured request completion logs.
 - `security.py`
-  - Reserved for future security helpers.
+  - Security response headers and request-body size enforcement.
+- `metrics.py`
+  - Low-cardinality HTTP counters, duration summaries, in-progress gauge, and
+    Prometheus rendering.
+
+### `app/repositories`
+
+- `lineage_repository.py`
+  - SQLite schema and access layer for immutable graph versions and persisted
+    scan-job status. Graph content hashes exclude capture time so unchanged
+    snapshots are deduplicated.
 
 ### `app/schemas`
 
@@ -376,6 +731,8 @@ Pydantic API contracts.
   - Workspace list/detail responses.
 - `report.py`
   - Report list/detail responses.
+- `gateway.py`
+  - Gateway list/detail and gateway datasource response contracts.
 - `report_page.py`
   - Report page list/detail responses.
 - `semantic_model.py`
@@ -386,7 +743,18 @@ Pydantic API contracts.
   - Raw Fabric semantic model definition response.
 - `parsed_semantic_model.py`
   - Parsed TMDL semantic model response with tables, columns, measures,
-    relationships, hierarchies, warnings, and source-path evidence.
+    relationships, hierarchies, partitions, warnings, and source-path evidence.
+- `dax_dependency.py`, `physical_source.py`
+  - DAX dependency and Power Query/gateway physical-source contracts.
+- `snowflake_auth.py`, `snowflake_lineage.py`
+  - Discriminated Snowflake authentication requests, sanitized session status,
+    SQL API normalization, and bounded deep-lineage snapshot contracts.
+- `lineage_graph.py`, `impact_analysis.py`, `estate.py`
+  - Canonical graph, reverse impact, and estate discovery contracts.
+- `lineage_persistence.py`, `lineage_change.py`, `lineage_search.py`
+  - Snapshot/version, incremental diff, search, and navigation contracts.
+- `lineage_validation.py`, `scan_job.py`, `operations.py`
+  - Data-quality validation, asynchronous jobs, and readiness contracts.
 - `normalized_report_definition.py`
   - API shape for normalized PBIR reports, pages, visuals, positions, semantic
     model references, and visual field references.
@@ -414,7 +782,10 @@ Business logic layer. Routes call services; services call clients.
 - `workspace_service.py`
   - Maps Power BI workspace payloads.
 - `report_service.py`
-  - Maps Power BI reports and pages.
+  - Maps workspace-scoped and My workspace Power BI reports, plus pages.
+- `gateway_service.py`
+  - Maps gateway and gateway datasource list/detail metadata, validates provider
+    identity, and preserves non-secret connection information.
 - `semantic_model_service.py`
   - Maps Power BI datasets/semantic models.
 - `report_definition_service.py`
@@ -444,6 +815,39 @@ Business logic layer. Routes call services; services call clients.
     semantic model references, and warnings.
 - `visual_field_reference_extractor.py`
   - Extracts visual-to-field references from PBIR visual semantic queries.
+- `dax_dependency_service.py`
+  - Resolves DAX references for measures and calculated columns/tables and uses
+    strongly connected components for dependency-cycle detection.
+- `physical_source_service.py`
+  - Extracts supported Power Query/M connector calls, navigation targets,
+    native SQL objects, and query-level mappings; safely reconciles gateway
+    connection endpoints.
+- `lineage_graph_service.py`
+  - Constructs canonical stable-ID nodes and upstream-to-downstream edges across
+    source, query, semantic, DAX, Snowflake, and report evidence.
+- `impact_analysis_service.py`, `lineage_search_service.py`
+  - Downstream impact traversal plus graph search and neighborhood navigation.
+- `estate_discovery_service.py`
+  - Discovers workspaces, reports, semantic models, report/model bindings, and
+    a canonical estate graph while retaining partial-workspace warnings.
+- `snowflake_lineage_service.py`
+  - Normalizes Snowflake object-dependency rows and deduplicates objects/edges.
+- `snowflake_deep_lineage_service.py`
+  - Expands five-level Snowflake table/column frontiers in bounded concurrent
+    waves with cycle detection, stable IDs, limits, and partial-branch warnings.
+- `lineage_store_service.py`, `ttl_cache.py`
+  - Cached access to versioned SQLite graph snapshots.
+- `lineage_change_service.py`, `lineage_validation_service.py`
+  - Version-to-version graph diffs and structural/data-quality checks.
+- `scan_job_service.py`
+  - Bounded asynchronous supplied-evidence and live graph-build jobs with
+    persisted status and interrupted-job recovery; provider tokens are retained
+    only by the running task.
+- `live_lineage_scan_service.py`
+  - Retrieves parsed TMDL plus optional report/gateway evidence and assembles a
+    validated canonical graph from live provider resources.
+- `operations_service.py`
+  - Database and production security configuration readiness checks.
 - `services/auth/device_auth_store.py`
   - In-memory device auth session/token store.
 - `services/auth/microsoft_device_auth_service.py`
@@ -456,7 +860,12 @@ Business logic layer. Routes call services; services call clients.
 - `services/auth/microsoft_auth_service.py`
   - Commented PKCE preparation helper from earlier auth design.
 - `services/auth/snowflake_auth_service.py`
-  - Placeholder for future Snowflake auth.
+  - Optional legacy Snowflake SQL API orchestration.
+- `services/auth/snowflake_session_auth_service.py`
+  - Connector authentication orchestration and sanitized status/logout models.
+- `services/auth/snowflake_session_store.py`
+  - Thread-safe process-local live connection store with expiry, active-use
+    checkout, deferred close, replacement cleanup, and shutdown cleanup.
 
 ### `tests`
 
@@ -467,11 +876,21 @@ Automated tests.
 - `tests/api/test_auth.py`
   - Device auth route/status/logout behavior.
 - `tests/api/test_report_resources.py`
-  - Report route behavior with dependency overrides.
+  - Workspace and My workspace report-route behavior with dependency overrides.
+- `tests/api/test_gateway_resources.py`
+  - Gateway route behavior with Power BI authentication overrides.
+- `tests/api/test_lineage_resources.py`
+  - Unified graph build/store/version/search/validation and analysis endpoints.
+- `tests/api/test_snowflake_auth.py`
+  - Snowflake auth cookie, status/logout, replacement, and trace-route behavior.
 - `tests/unit/test_microsoft_auth.py`
   - Scope diagnostic helper tests.
 - `tests/unit/test_report_service.py`
-  - Report service mapping/validation.
+  - Workspace and My workspace report-service mapping/validation.
+- `tests/unit/test_powerbi_client.py`
+  - My workspace report, gateway, and gateway datasource URL construction.
+- `tests/unit/test_gateway_service.py`
+  - Gateway and datasource mapping, including provider identity validation.
 - `tests/unit/test_semantic_model_service.py`
   - Semantic model service mapping/validation.
 - `tests/unit/test_report_definition_service.py`
@@ -501,6 +920,28 @@ Automated tests.
   - Visual semantic field extraction.
 - `tests/unit/test_logging.py`
   - Sensitive value redaction.
+- `tests/unit/test_dax_dependency_service.py`
+  - DAX dependencies, unresolved references, string/comment exclusion, cycles.
+- `tests/unit/test_physical_source_service.py`
+  - Power Query/M, native SQL, gateway sanitization, and source mappings.
+- `tests/unit/test_lineage_graph_service.py`
+  - Canonical graph and end-to-end downstream impact paths.
+- `tests/unit/test_estate_discovery_service.py`
+  - Estate inventory, report/model bindings, and estate graph behavior.
+- `tests/unit/test_snowflake_lineage_service.py`
+  - Snowflake dependency normalization and SQL API request contracts.
+- `tests/unit/test_snowflake_session_auth.py`
+  - Password/MFA, RSA, external-browser, OAuth, connector identity, redaction,
+    expiry, active checkout, and connection cleanup.
+- `tests/unit/test_snowflake_deep_lineage_service.py`
+  - Five-level continuation, seven-branch concurrency, table/column modes,
+    quoted identifiers, query binding, cycles, limits, and branch failures.
+- `tests/unit/test_lineage_platform_services.py`
+  - SQLite versions, diffs, TTL cache, search/navigation, validation, and jobs.
+- `tests/unit/test_live_lineage_scan_service.py`
+  - Live TMDL/gateway orchestration, partial gateway access, and graph output.
+- `tests/unit/test_security_operations.py`
+  - Security headers, API-key enforcement, body limits, readiness, and metrics.
 
 ## Phase History
 
@@ -532,22 +973,34 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 28, 2026 | Phase 3.12.2 | Completed locally | Added upstream provider diagnostic detail for Fabric request and operation failures. |
 | Aug 28, 2026 | Phase 3.13 | Completed locally | Implemented the XMLA ADODB/MSOLAP adapter path and TMSCHEMA metadata extraction mapping. |
 | Aug 28, 2026 | Phase 3.14 | Completed locally | Added source-preserving Fabric TMDL/XMLA semantic metadata reconciliation. |
+| Aug 31, 2026 | Phase 6.0 | Completed locally | Added My workspace report detail, gateway discovery, and gateway datasource metadata contracts. |
+| Aug 31, 2026 | Phase 5.1-5.5 | Completed locally | Added DAX reference resolution and dependency-cycle detection for measures and calculated columns/tables. |
+| Aug 31, 2026 | Phase 6.1-6.4 | Completed locally | Added Power Query/M extraction, source detection, physical-object mapping, and tested gateway/query mappings. |
+| Aug 31, 2026 | Phase 7 | Completed locally | Added canonical stable-ID nodes, edges, and end-to-end graph construction. |
+| Aug 31, 2026 | Phase 8 | Completed locally | Added downstream reverse-impact paths with depth limits. |
+| Aug 31, 2026 | Phase 9 | Completed locally | Added workspace/estate inventory, report/model bindings, and an estate graph. |
+| Aug 31, 2026 | Phase 10 | Completed locally | Added optional Snowflake SQL API/object-dependency normalization, connector authentication sessions, and concurrent deep table/column lineage. |
+| Aug 31, 2026 | Phase 11-17 | Completed locally | Added unified APIs, search/navigation, TTL caching, scan jobs, SQLite versions, incremental diffs, and validation. |
+| Aug 31, 2026 | Phase 18-20 | Completed locally | Added configurable security controls, operational readiness, and Prometheus metrics. |
+| Deferred | Phase 21 | Not started by design | PowerAI remains excluded until backend and frontend workflows are complete. |
 
 The Phase 3.6-3.14 execution labels are retained for history. Against the
 original roadmap, they finish Phase 3 report-level lineage and implement Phase
-4 semantic model metadata. The next numbered roadmap work is Phase 5.1.
+4 semantic model metadata. The original roadmap numbering above is now the
+authoritative phase view; Phase 6.0 remains only a historical execution label.
 
 ### Latest Completed Phase
 
-Phase 3.14 is the latest completed local phase. It adds a combined semantic
-metadata endpoint that retrieves parsed Fabric TMDL and XMLA metadata using
-their respective tokens, preserves both source payloads, validates route/source
-identity, and reconciles semantic objects without silently choosing a winner.
-TMDL remains the source-path authority; XMLA contributes live runtime metadata.
+Phase 20 is the latest completed backend implementation phase. Phases 5 through
+20 are covered by service/API tests and retain the existing architecture rule
+that source evidence is preserved rather than silently overwritten.
 
 ### Next Phase
 
-Original Phase 5.1 - Measure DAX Parsing is the next implementation phase.
+No PowerAI work starts next. The immediate work is live tenant acceptance,
+including Snowflake auth/`GET_LINEAGE`, frontend integration, broader DAX/M
+fixture coverage, and replacing in-memory auth plus single-instance SQLite/job
+coordination before horizontal scaling.
 
 The Phase 3.14 implementation has a tenant-dependent acceptance check that is
 not part of local automated testing:
@@ -561,8 +1014,8 @@ not part of local automated testing:
 
 ## Current Review Notes
 
-Phase 3.6 through Phase 3.14 are locally verified with Ruff and pytest. The
-only current test-suite warning is a third-party FastAPI/TestClient warning
+Phases 3.6 through 20 are locally verified with Ruff and pytest: 197 tests pass.
+The only known test-suite warning is a third-party FastAPI/TestClient warning
 about Starlette's `httpx` integration.
 
 ## Development Notes

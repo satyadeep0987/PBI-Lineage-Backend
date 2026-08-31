@@ -59,6 +59,23 @@ class ReportService:
             raw_report
         )
 
+    async def get_my_workspace_report(
+        self,
+        *,
+        report_id: str,
+        access_token: str,
+    ) -> Report:
+        raw_report = (
+            await self.client.get_report_in_my_workspace(
+                report_id=report_id,
+                access_token=access_token,
+            )
+        )
+
+        return self._map_report(
+            raw_report
+        )
+
     async def list_pages(
         self,
         *,

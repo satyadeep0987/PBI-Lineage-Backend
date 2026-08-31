@@ -2,7 +2,11 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     auth,
+    gateways,
     health,
+    lineage,
+    reports,
+    snowflake_auth,
     workspaces,
 )
 
@@ -21,7 +25,31 @@ api_router.include_router(
 )
 
 api_router.include_router(
+    snowflake_auth.router,
+    prefix="/auth/snowflake",
+    tags=["Authentication"],
+)
+
+api_router.include_router(
     workspaces.router,
     prefix="/workspaces",
     tags=["Workspaces"],
+)
+
+api_router.include_router(
+    reports.router,
+    prefix="/reports",
+    tags=["Reports"],
+)
+
+api_router.include_router(
+    gateways.router,
+    prefix="/gateways",
+    tags=["Gateways"],
+)
+
+api_router.include_router(
+    lineage.router,
+    prefix="/lineage",
+    tags=["Lineage"],
 )

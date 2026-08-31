@@ -5,6 +5,7 @@ from app.core.auth_session import (
     AUTH_SESSION_COOKIE,
     AUTH_SESSION_MAX_AGE_SECONDS,
 )
+from app.core.config import get_settings
 from app.core.exceptions import (
     AuthenticationSessionExpiredError,
     AuthenticationSessionRequiredError,
@@ -244,6 +245,7 @@ async def start_microsoft_device_authentication(
     request: MicrosoftDeviceAuthRequest,
     response: Response,
 ) -> MicrosoftDeviceAuthStartResponse:
+    settings = get_settings()
     service = MicrosoftDeviceAuthService()
 
     session_id, flow = await service.start(
@@ -258,8 +260,8 @@ async def start_microsoft_device_authentication(
             AUTH_SESSION_MAX_AGE_SECONDS
         ),
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite,
         path="/",
     )
 
@@ -328,6 +330,7 @@ async def logout_microsoft_device_session(
         alias=AUTH_SESSION_COOKIE,
     ),
 ) -> dict[str, str]:
+    settings = get_settings()
 
     if session_id:
         delete_device_session(
@@ -337,6 +340,8 @@ async def logout_microsoft_device_session(
     response.delete_cookie(
         key=AUTH_SESSION_COOKIE,
         path="/",
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite,
     )
 
     return {
