@@ -449,7 +449,7 @@ class LineageGraphService:
                 LineageNode(
                     node_id=item.object_id,
                     node_type="snowflake_object",
-                    name=item.object_name,
+                    name=item.column_name or item.object_name,
                     qualified_name=item.qualified_name,
                     workspace_id=model.workspace_id,
                     semantic_model_id=model.semantic_model_id,
@@ -458,6 +458,8 @@ class LineageGraphService:
                         "database": item.database,
                         "schema": item.schema_name,
                         "object_domain": item.object_domain,
+                        "column_name": item.column_name,
+                        "status": item.status,
                     },
                 ),
             )
@@ -469,7 +471,11 @@ class LineageGraphService:
                 dependency.target.object_id,
                 "snowflake_dependency",
                 True,
-                {"dependency_type": dependency.dependency_type},
+                {
+                    "dependency_type": dependency.dependency_type,
+                    "distance": dependency.distance,
+                    "process": dependency.process,
+                },
             )
 
         snowflake_ids = {

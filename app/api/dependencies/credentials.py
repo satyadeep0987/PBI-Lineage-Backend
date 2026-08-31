@@ -22,6 +22,7 @@ from app.services.auth.device_auth_store import (
     get_fabric_token,
     get_powerbi_token,
 )
+from app.services.auth.snowflake_session_store import SNOWFLAKE_SESSION_COOKIE
 
 bearer_scheme = HTTPBearer(
     auto_error=False,
@@ -113,3 +114,14 @@ async def get_fabric_access_token(
         )
 
     return token
+
+
+async def get_snowflake_session_id(
+    session_id: str | None = Cookie(
+        default=None,
+        alias=SNOWFLAKE_SESSION_COOKIE,
+    ),
+) -> str:
+    if not session_id:
+        raise ProviderAuthenticationRequiredError(provider="snowflake")
+    return session_id

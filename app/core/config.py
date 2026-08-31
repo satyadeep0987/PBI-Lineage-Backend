@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     lineage_cache_ttl_seconds: float = Field(default=30.0, ge=0.0)
     lineage_cache_max_entries: int = Field(default=128, ge=1)
     lineage_scan_max_concurrency: int = Field(default=2, ge=1, le=32)
+    snowflake_session_max_age_seconds: int = Field(
+        default=45 * 60,
+        ge=60,
+        le=24 * 60 * 60,
+    )
+    snowflake_allow_external_browser_auth: bool = False
 
     cors_allowed_origins: list[str] = Field(default_factory=list)
     allowed_hosts: list[str] = Field(default_factory=lambda: ["*"])

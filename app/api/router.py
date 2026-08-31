@@ -6,6 +6,7 @@ from app.api.v1 import (
     health,
     lineage,
     reports,
+    snowflake_auth,
     workspaces,
 )
 
@@ -20,6 +21,12 @@ api_router.include_router(
 api_router.include_router(
     auth.router,
     prefix="/auth",
+    tags=["Authentication"],
+)
+
+api_router.include_router(
+    snowflake_auth.router,
+    prefix="/auth/snowflake",
     tags=["Authentication"],
 )
 

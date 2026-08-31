@@ -264,6 +264,19 @@ class ProviderResourceNotFoundError(AppException):
         )
 
 
+class ProviderAuthenticationFailedError(AppException):
+    def __init__(self, provider: str) -> None:
+        super().__init__(
+            code="AUTH_PROVIDER_FAILED",
+            message=(
+                f"{_provider_label(provider)} authentication failed. "
+                "Verify the account, identity, authenticator, and assigned role."
+            ),
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            provider=provider,
+        )
+
+
 class ResourceNotFoundError(AppException):
     def __init__(self, resource: str) -> None:
         super().__init__(

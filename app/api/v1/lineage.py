@@ -7,6 +7,7 @@ from app.api.dependencies.credentials import (
     get_bearer_token,
     get_fabric_access_token,
     get_powerbi_access_token,
+    get_snowflake_session_id,
 )
 from app.api.dependencies.lineage import (
     get_lineage_scan_manager,
@@ -42,6 +43,8 @@ from app.schemas.scan_job import (
     LiveLineageScanRequest,
 )
 from app.schemas.snowflake_lineage import (
+    SnowflakeDeepLineageRequest,
+    SnowflakeDeepLineageResponse,
     SnowflakeLineageDiscoveryRequest,
     SnowflakeLineageRowsRequest,
     SnowflakeLineageSnapshot,
@@ -61,6 +64,9 @@ from app.services.lineage_validation_service import LineageValidationService
 from app.services.live_lineage_scan_service import LiveLineageScanService
 from app.services.physical_source_service import PhysicalSourceDiscoveryService
 from app.services.scan_job_service import LineageScanJobManager
+from app.services.snowflake_deep_lineage_service import (
+    SnowflakeDeepLineageService,
+)
 from app.services.snowflake_lineage_service import SnowflakeLineageService
 
 router = APIRouter(dependencies=[Depends(require_lineage_api_key)])
@@ -122,6 +128,21 @@ async def discover_snowflake_lineage(
         )
     except ValueError as exc:
         raise InvalidLineageRequestError(str(exc)) from exc
+
+
+@router.post(
+    "/snowflake/trace",
+    response_model=SnowflakeDeepLineageResponse,
+)
+async def trace_snowflake_lineage(
+    request: SnowflakeDeepLineageRequest,
+    session_id: Annotated[str, Depends(get_snowflake_session_id)],
+) -> SnowflakeDeepLineageResponse:
+    return await asyncio.to_thread(
+        SnowflakeDeepLineageService().trace_session,
+        session_id,
+        request,
+    )
 
 
 @router.post(
