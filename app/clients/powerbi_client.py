@@ -2,7 +2,10 @@ from typing import Any
 
 import httpx
 
-from app.clients.provider_http_client import provider_get
+from app.clients.provider_http_client import (
+    provider_get,
+    provider_post,
+)
 from app.core.exceptions import UpstreamInvalidResponseError
 
 
@@ -51,6 +54,25 @@ class PowerBIClient:
             )
 
         return items
+
+    @staticmethod
+    def _parse_array_response(
+        response: httpx.Response,
+    ) -> list[dict[str, Any]]:
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise UpstreamInvalidResponseError(
+                "powerbi"
+            ) from exc
+
+        if not isinstance(payload, list) or not all(
+            isinstance(item, dict) for item in payload
+        ):
+            raise UpstreamInvalidResponseError(
+                "powerbi"
+            )
+        return payload
 
     async def validate_connection(
         self,
@@ -233,6 +255,93 @@ class PowerBIClient:
         )
 
         return self._parse_list_response(response)
+
+    async def get_modified_workspaces(
+        self,
+        *,
+        access_token: str,
+        modified_since: str | None,
+        exclude_personal_workspaces: bool,
+        exclude_inactive_workspaces: bool,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {
+            "excludePersonalWorkspaces": exclude_personal_workspaces,
+            "excludeInActiveWorkspaces": exclude_inactive_workspaces,
+        }
+        if modified_since is not None:
+            params["modifiedSince"] = modified_since
+
+        response = await provider_get(
+            provider="powerbi",
+            url=(
+                f"{self.BASE_URL}/admin/workspaces/modified"
+            ),
+            access_token=access_token,
+            params=params,
+        )
+        return self._parse_array_response(response)
+
+    async def start_workspace_scan(
+        self,
+        *,
+        access_token: str,
+        workspace_ids: list[str],
+        lineage: bool,
+        datasource_details: bool,
+        dataset_schema: bool,
+        dataset_expressions: bool,
+        get_artifact_users: bool,
+    ) -> dict[str, Any]:
+        response = await provider_post(
+            provider="powerbi",
+            url=(
+                f"{self.BASE_URL}/admin/workspaces/getInfo"
+            ),
+            access_token=access_token,
+            params={
+                "lineage": lineage,
+                "datasourceDetails": datasource_details,
+                "datasetSchema": dataset_schema,
+                "datasetExpressions": dataset_expressions,
+                "getArtifactUsers": get_artifact_users,
+            },
+            json_body={"workspaces": workspace_ids},
+        )
+        return self._parse_object_response(response)
+
+    async def get_workspace_scan_status(
+        self,
+        *,
+        access_token: str,
+        scan_id: str,
+    ) -> dict[str, Any]:
+        response = await provider_get(
+            provider="powerbi",
+            url=(
+                f"{self.BASE_URL}/admin/workspaces/"
+                f"scanStatus/{scan_id}"
+            ),
+            access_token=access_token,
+            not_found_resource="scanner scan",
+        )
+        return self._parse_object_response(response)
+
+    async def get_workspace_scan_result(
+        self,
+        *,
+        access_token: str,
+        scan_id: str,
+    ) -> dict[str, Any]:
+        response = await provider_get(
+            provider="powerbi",
+            url=(
+                f"{self.BASE_URL}/admin/workspaces/"
+                f"scanResult/{scan_id}"
+            ),
+            access_token=access_token,
+            not_found_resource="scanner scan",
+        )
+        return self._parse_object_response(response)
 
 
     async def get_report_pages(

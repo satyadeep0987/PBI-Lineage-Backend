@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 
 class MicrosoftAuthRequest(BaseModel):
@@ -116,4 +116,44 @@ class MicrosoftDeviceAuthStatusResponse(BaseModel):
 
     fabric: ProviderTestResult | None = None
 
+    message: str | None = None
+
+
+class MicrosoftServicePrincipalAuthRequest(BaseModel):
+    tenant_id: str = Field(
+        min_length=1,
+        max_length=128,
+    )
+    client_id: str = Field(
+        min_length=1,
+        max_length=128,
+    )
+    client_secret: SecretStr = Field(
+        min_length=1,
+        max_length=4096,
+    )
+
+
+class MicrosoftApplicationTokenResult(BaseModel):
+    token_acquired: bool
+    resource: str
+    requested_scope: str
+    granted_roles: list[str] = Field(
+        default_factory=list
+    )
+    error_code: str | None = None
+    message: str
+
+
+class MicrosoftServicePrincipalAuthResponse(BaseModel):
+    session_id: str
+    status: Literal[
+        "authenticated",
+        "partial",
+    ]
+    authentication_method: Literal[
+        "client_secret"
+    ] = "client_secret"
+    powerbi: MicrosoftApplicationTokenResult
+    fabric: MicrosoftApplicationTokenResult
     message: str | None = None

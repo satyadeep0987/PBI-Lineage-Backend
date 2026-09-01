@@ -12,7 +12,9 @@ architecture.
 
 Current capabilities:
 
-- Starts Microsoft device-code authentication for local/backend testing.
+- Supports Microsoft device-code authentication for interactive testing and
+  Microsoft Entra service-principal client-secret authentication for
+  unattended application sessions.
 - Stores short-lived in-memory auth sessions.
 - Lists Power BI workspaces.
 - Gets one Power BI workspace.
@@ -25,6 +27,9 @@ Current capabilities:
 - Lists Power BI gateways for which the authenticated user is an administrator.
 - Gets connection metadata for one datasource on an accessible Power BI gateway.
 - Lists datasources on an accessible Power BI gateway.
+- Runs the Power BI Admin metadata-scanning workflow for modified workspace
+  discovery, scan submission, status polling, and complete scan-result
+  retrieval.
 - Retrieves Fabric report definitions.
 - Decodes and normalizes PBIR report definitions.
 - Extracts visual titles, visual positions, visual types, page metadata, and
@@ -55,6 +60,10 @@ Current capabilities:
   targets, files, URLs, storage accounts, and query-to-source mappings.
 - Parses an allowlisted, non-secret subset of gateway `connectionDetails` and
   matches gateway datasources to detected query sources.
+- Exposes five frontend-ready explorer datasets plus one combined snapshot for
+  source database lineage, semantic objects, DAX-to-source lineage, report
+  layout, and visual-to-semantic lookup. Shared provider evidence is fetched
+  once per request with bounded concurrency.
 - Builds canonical upstream-to-downstream lineage graphs spanning physical
   sources, queries, semantic objects, DAX dependencies, and report visuals.
 - Provides reverse impact, graph search, and upstream/downstream navigation.
@@ -101,6 +110,7 @@ workflows are complete. No PowerAI endpoint or service is included in this phase
 - httpx
 - MSAL
 - Snowflake Connector for Python
+- Snowpark Python
 - cryptography for in-memory RSA key loading
 - uv
 - pytest / pytest-asyncio
@@ -277,6 +287,9 @@ POST /api/v1/auth/microsoft/device/start
 GET  /api/v1/auth/microsoft/device/status
 GET  /api/v1/auth/microsoft/device/{session_id}/status
 POST /api/v1/auth/microsoft/device/logout
+POST /api/v1/auth/microsoft/service-principal/session
+GET  /api/v1/auth/microsoft/service-principal/session/status
+DELETE /api/v1/auth/microsoft/service-principal/session
 POST /api/v1/auth/snowflake/session
 GET  /api/v1/auth/snowflake/session/status
 DELETE /api/v1/auth/snowflake/session
@@ -291,6 +304,27 @@ Device auth status is intended to show:
 - Granted scopes.
 - Missing scopes.
 - Provider error code.
+
+The service-principal session route accepts `tenant_id`, `client_id`, and
+`client_secret`, then requests independent application tokens for these MSAL
+client-credential scopes:
+
+```text
+https://analysis.windows.net/powerbi/api/.default
+https://api.fabric.microsoft.com/.default
+```
+
+The client secret is a write-only request value. It is not returned, logged,
+or stored in the process-local session. The response reports token acquisition
+and any JWT application roles; it does not claim that a downstream tenant API
+has authorized the app. A Power BI token is required for session creation. If
+Fabric token acquisition fails, the response is `partial` and the Power BI
+token remains usable. These routes use `X-Lineage-Admin-Key` when
+`LINEAGE_ADMIN_API_KEY` is configured.
+
+Microsoft's official client-credential flow uses one resource's `/.default`
+scope per token request. See [Microsoft identity platform daemon application
+guidance](https://learn.microsoft.com/en-us/entra/identity-platform/scenario-daemon-acquire-token).
 
 The Snowflake routes create, inspect, and close a separate HttpOnly session
 cookie named `pbi_lineage_snowflake_session`. They do not reuse the Microsoft
@@ -326,6 +360,138 @@ Virtual network gateways are not supported by these Power BI APIs. Datasource
 responses preserve connection metadata and credential type, but never expose
 credential values.
 
+### Power BI Scanner
+
+The Scanner routes have their own `Scanner` section in Swagger:
+
+```text
+GET  /api/v1/scanner/workspaces/modified
+POST /api/v1/scanner/workspaces/scan
+GET  /api/v1/scanner/scans/{scan_id}/status
+GET  /api/v1/scanner/scans/{scan_id}/result
+```
+
+Recommended app-only workflow:
+
+1. Authenticate with `POST /auth/microsoft/service-principal/session`.
+2. Get tenant workspace IDs from `/scanner/workspaces/modified`. Optional
+   `modified_since` must be UTC and between 30 minutes and 30 days old.
+3. Submit 1-100 workspace UUIDs to `/scanner/workspaces/scan`.
+4. Poll `/scanner/scans/{scan_id}/status` until `status` is `Succeeded`.
+5. Read `/scanner/scans/{scan_id}/result` within 24 hours.
+
+Scan request example:
+
+```json
+{
+  "workspaces": ["<workspace-uuid>"],
+  "lineage": true,
+  "datasource_details": true,
+  "dataset_schema": true,
+  "dataset_expressions": true,
+  "get_artifact_users": false
+}
+```
+
+The result response contains `scan_id`, sorted top-level `sections`, an
+inventory `summary`, and `payload`. `payload` is the complete Microsoft
+response and is intentionally not narrowed by backend schemas. Depending on
+the requested flags, tenant settings, item type, and available metadata, it can
+contain:
+
+- Workspaces, state/capacity/storage properties, tags, and users.
+- Reports, dashboards and tiles, semantic models/datasets, dataflows, and
+  datamarts.
+- Report/model ownership, timestamps, endorsement, sensitivity labels, users,
+  and tags.
+- Semantic tables, columns, measures and DAX, relationships, roles and row
+  filters, shared expressions, table source/M expressions, and upstream
+  dataflow references.
+- Datasource usages plus top-level `datasourceInstances` connection details and
+  `misconfiguredDatasourceInstances`.
+
+`get_artifact_users` defaults to false because it can return user identifiers.
+The summary counts workspaces, artifacts, semantic objects, expressions, and
+datasource instances while the raw payload remains authoritative.
+
+For service-principal scanning, enable the app's security group in the Fabric
+admin setting for read-only admin APIs. Microsoft requires that this app have
+no admin-consent-required Power BI permissions configured. Enable the separate
+detailed-metadata and DAX/mashup-expression tenant settings when schema and
+expressions are needed. Delegated administrator tokens instead require
+`Tenant.Read.All` or `Tenant.ReadWrite.All`; the current device-code flow does
+not request either tenant-wide scope. See [metadata scanning
+setup](https://learn.microsoft.com/en-us/fabric/admin/metadata-scanning-setup),
+[metadata scanning overview](https://learn.microsoft.com/en-us/fabric/governance/metadata-scanning-overview),
+and the official [scan submission API](https://learn.microsoft.com/en-us/rest/api/power-bi/admin/workspace-info-post-workspace-info).
+
+Microsoft limits modified-workspace discovery to 30 calls/hour, scan
+submissions to 500 calls/hour with at most 16 simultaneous requests, and scan
+result reads to 500 calls/hour. The backend maps provider `401`, `403`, `429`,
+and upstream failures through the existing structured error contract; it does
+not bypass or locally emulate these tenant controls.
+
+### Explorer Data
+
+```text
+POST /api/v1/explorer/snapshot
+POST /api/v1/explorer/source-database-lineage
+POST /api/v1/explorer/semantic-model-objects
+POST /api/v1/explorer/measure-source-lineage
+POST /api/v1/explorer/report-layout
+POST /api/v1/explorer/visual-source-lookup
+```
+
+These routes are the typed replacement for the five legacy Streamlit tables.
+Use `/snapshot` for the initial explorer load; it retrieves each distinct
+workspace, report, report definition, and semantic model definition once, runs
+independent provider calls concurrently with a bounded limit, and derives all
+five datasets from the shared evidence. Use a focused endpoint for lazy-loaded
+tabs when only one table is needed. DAX and Power Query analysis run outside the
+event loop, and two reports sharing one semantic model share one definition
+request.
+
+Request example:
+
+```json
+{
+  "reports": [
+    {
+      "workspace_id": "<workspace-uuid>",
+      "report_id": "<report-uuid>",
+      "semantic_model_id": "<optional-model-uuid>",
+      "semantic_model_workspace_id": "<optional-model-workspace-uuid>",
+      "app_name": "<optional-display-context>"
+    }
+  ],
+  "include_gateway_sources": false,
+  "report_definition_format": "PBIR",
+  "semantic_model_definition_format": "TMDL"
+}
+```
+
+`semantic_model_id` is inferred from the Power BI report or normalized PBIR
+connection when omitted. Keep `semantic_model_workspace_id` separate for
+cross-workspace bindings. Gateway discovery is opt-in because it adds calls and
+requires gateway-admin access. `app_name` is optional caller-supplied display
+context; the service does not guess app membership from workspace report data.
+The source and measure datasets return Snowflake-ready
+`source_fully_qualified_name` values without the separate server/account host.
+After Snowflake session authentication, pass a selected table or table/column
+to `POST /api/v1/lineage/snowflake/trace` for the legacy table-lineage or
+column-lineage action; explorer retrieval does not trigger Snowflake queries
+automatically.
+
+Legacy screen mapping:
+
+| Legacy table | Endpoint | Main response rows |
+|---|---|---|
+| Source DB Lineage | `/explorer/source-database-lineage` | Report/model IDs, semantic table and partition, provider endpoint/object, fully qualified source name, gateway IDs |
+| Semantic Model Objects | `/explorer/semantic-model-objects` | Tables, columns, calculated columns/tables, measures, hierarchies, DAX, types, visibility, and source paths |
+| Measure Source Lineage | `/explorer/measure-source-lineage` | Measure/calculated-object DAX, terminal semantic sources, dependency depth, physical source, and fully qualified name |
+| Report Layout | `/explorer/report-layout` | Pages, visuals, roles, fields, query references, definition counts, and visual coordinates |
+| Visual Source Lookup | `/explorer/visual-source-lookup` | Visual fields joined to semantic objects with status, confidence, reason, source path, and coordinates |
+
 ### Unified Lineage
 
 ```text
@@ -355,7 +521,8 @@ not confuse ownership structure with data flow. Re-saving unchanged graph
 content does not create a new version; changed content receives the next SQLite
 snapshot version and can be compared through the `changes` endpoint.
 
-When `LINEAGE_ADMIN_API_KEY` is configured, every `/lineage` endpoint requires
+When `LINEAGE_ADMIN_API_KEY` is configured, every `/lineage` and `/scanner`
+endpoint plus Snowflake and Microsoft service-principal session routes require
 the `X-Lineage-Admin-Key` header. Power BI estate discovery additionally uses
 the existing authenticated Microsoft session. Gateway `connectionDetails`
 parsing is restricted to an allowlist of endpoint metadata and never includes
@@ -621,12 +788,17 @@ FastAPI routing layer.
 
 - `app/api/router.py`
   - Combines all v1 routers under health, Microsoft/Snowflake auth, workspaces,
-    reports, gateways, and lineage.
+    reports, gateways, scanner, explorer, and lineage.
 - `app/api/v1/health.py`
   - Health, liveness, and readiness endpoints.
 - `app/api/v1/auth.py`
-  - Microsoft device auth start/status/logout endpoints.
-  - In-progress scope diagnostics for Power BI and Fabric status.
+  - Microsoft device auth plus protected client-secret service-principal
+    session/status/logout endpoints.
+  - Delegated scope diagnostics and application-token status for Power BI and
+    Fabric.
+- `app/api/v1/scanner.py`
+  - Protected modified-workspace, scan submission, status, and full-result
+    endpoints in a separate Swagger section.
 - `app/api/v1/snowflake_auth.py`
   - Password/MFA, RSA key-pair, external-browser, and OAuth Snowflake session
     authentication plus cookie status/logout.
@@ -638,6 +810,8 @@ FastAPI routing layer.
   - My workspace Power BI report-detail endpoint.
 - `app/api/v1/gateways.py`
   - Gateway discovery plus gateway datasource list/detail endpoints.
+- `app/api/v1/explorer.py`
+  - Combined and focused frontend-ready explorer data endpoints.
 - `app/api/v1/lineage.py`
   - Unified DAX, physical-source, Snowflake normalization, supplied-evidence
     and live graph, deep Snowflake table/column tracing, impact, search,
@@ -660,7 +834,7 @@ should not contain business normalization logic.
     extraction.
 - `powerbi_client.py`
   - Power BI REST API client for workspace resources, My workspace report
-    detail, gateways, and gateway datasources.
+    detail, gateways, gateway datasources, and Admin metadata scanning.
 - `fabric_client.py`
   - Microsoft Fabric API client.
   - Handles report and semantic model definition endpoints and long-running
@@ -746,6 +920,12 @@ Pydantic API contracts.
     relationships, hierarchies, partitions, warnings, and source-path evidence.
 - `dax_dependency.py`, `physical_source.py`
   - DAX dependency and Power Query/gateway physical-source contracts.
+- `explorer.py`
+  - Multi-report explorer request, five typed flat-row datasets, warnings,
+    selected-report context, and combined snapshot contracts.
+- `scanner.py`
+  - Scanner request/status contracts, modified workspace IDs, result summary,
+    and complete provider payload response.
 - `snowflake_auth.py`, `snowflake_lineage.py`
   - Discriminated Snowflake authentication requests, sanitized session status,
     SQL API normalization, and bounded deep-lineage snapshot contracts.
@@ -767,8 +947,8 @@ Pydantic API contracts.
 - `semantic_model_metadata.py`
   - Combined Fabric TMDL/XMLA metadata response and reconciliation evidence.
 - `auth.py`
-  - Microsoft auth requests, device flow responses, provider connection status,
-    and scope diagnostics.
+  - Microsoft device and client-secret requests/responses, delegated scope
+    diagnostics, and application-token status.
 - `error.py`
   - Structured API error response models.
 - `exceptions.py`
@@ -822,6 +1002,13 @@ Business logic layer. Routes call services; services call clients.
   - Extracts supported Power Query/M connector calls, navigation targets,
     native SQL objects, and query-level mappings; safely reconciles gateway
     connection endpoints.
+- `explorer_service.py`
+  - Deduplicates request-scoped provider retrieval by workspace/report/model,
+    applies bounded concurrency, and assembles the five UI-ready datasets.
+- `scanner_service.py`
+  - Maps scanner workflow responses, validates provider identities/shapes,
+    normalizes modified timestamps, summarizes inventory, and preserves the
+    complete result payload.
 - `lineage_graph_service.py`
   - Constructs canonical stable-ID nodes and upstream-to-downstream edges across
     source, query, semantic, DAX, Snowflake, and report evidence.
@@ -853,6 +1040,9 @@ Business logic layer. Routes call services; services call clients.
 - `services/auth/microsoft_device_auth_service.py`
   - MSAL device-code auth, token validation, Fabric silent auth attempt, and
     scope diagnostic population.
+- `services/auth/microsoft_service_principal_auth_service.py`
+  - Uses MSAL confidential-client `/.default` token requests for Power BI and
+    Fabric, stores only short-lived tokens, and reports partial Fabric auth.
 - `services/auth/powerbi_auth_service.py`
   - Power BI token validation wrapper.
 - `services/auth/fabric_auth_service.py`
@@ -875,6 +1065,11 @@ Automated tests.
   - FastAPI test client fixture.
 - `tests/api/test_auth.py`
   - Device auth route/status/logout behavior.
+- `tests/api/test_microsoft_service_principal_auth.py`
+  - Client-secret route, HttpOnly cookie, status, and secret-redaction behavior.
+- `tests/api/test_scanner_resources.py`
+  - Scanner route registration, authentication dependency, requests, and
+    response shapes.
 - `tests/api/test_report_resources.py`
   - Workspace and My workspace report-route behavior with dependency overrides.
 - `tests/api/test_gateway_resources.py`
@@ -889,6 +1084,12 @@ Automated tests.
   - Workspace and My workspace report-service mapping/validation.
 - `tests/unit/test_powerbi_client.py`
   - My workspace report, gateway, and gateway datasource URL construction.
+- `tests/unit/test_scanner_client.py`, `tests/unit/test_scanner_service.py`
+  - Official Admin API URLs/options, scan mapping, full payload preservation,
+    and summary counts.
+- `tests/unit/test_microsoft_service_principal_auth_service.py`
+  - App-only Power BI/Fabric acquisition, partial auth, failure handling, and
+    non-persistence of the submitted client secret.
 - `tests/unit/test_gateway_service.py`
   - Gateway and datasource mapping, including provider identity validation.
 - `tests/unit/test_semantic_model_service.py`
@@ -940,6 +1141,9 @@ Automated tests.
   - SQLite versions, diffs, TTL cache, search/navigation, validation, and jobs.
 - `tests/unit/test_live_lineage_scan_service.py`
   - Live TMDL/gateway orchestration, partial gateway access, and graph output.
+- `tests/unit/test_explorer_service.py`, `tests/api/test_explorer_resources.py`
+  - Explorer call deduplication, bounded concurrency, all five row mappings,
+    focused route selection, authentication dependencies, and validation.
 - `tests/unit/test_security_operations.py`
   - Security headers, API-key enforcement, body limits, readiness, and metrics.
 
@@ -982,6 +1186,8 @@ maintainer. Commit IDs and author details are intentionally omitted.
 | Aug 31, 2026 | Phase 10 | Completed locally | Added optional Snowflake SQL API/object-dependency normalization, connector authentication sessions, and concurrent deep table/column lineage. |
 | Aug 31, 2026 | Phase 11-17 | Completed locally | Added unified APIs, search/navigation, TTL caching, scan jobs, SQLite versions, incremental diffs, and validation. |
 | Aug 31, 2026 | Phase 18-20 | Completed locally | Added configurable security controls, operational readiness, and Prometheus metrics. |
+| Sep 1, 2026 | Explorer read-model integration | Completed locally | Added five focused frontend datasets, a shared snapshot API, request-scoped call deduplication, and bounded parallel retrieval. |
+| Sep 2, 2026 | Microsoft app auth and metadata scanner | Completed locally | Added protected Entra client-secret sessions plus the official four-step Power BI Admin scanner workflow with full-payload retention and summary counts. |
 | Deferred | Phase 21 | Not started by design | PowerAI remains excluded until backend and frontend workflows are complete. |
 
 The Phase 3.6-3.14 execution labels are retained for history. Against the
@@ -991,9 +1197,11 @@ authoritative phase view; Phase 6.0 remains only a historical execution label.
 
 ### Latest Completed Phase
 
-Phase 20 is the latest completed backend implementation phase. Phases 5 through
-20 are covered by service/API tests and retain the existing architecture rule
-that source evidence is preserved rather than silently overwritten.
+Phase 20 is the latest completed roadmap phase. The explorer read models and
+Microsoft app-auth/scanner integration are post-phase extensions and do not
+renumber the roadmap. They strengthen original Phase 2 authentication and
+Phase 9 estate discovery while retaining the rule that source evidence is
+preserved rather than silently overwritten.
 
 ### Next Phase
 
@@ -1014,7 +1222,8 @@ not part of local automated testing:
 
 ## Current Review Notes
 
-Phases 3.6 through 20 are locally verified with Ruff and pytest: 197 tests pass.
+Phases 3.6 through 20, the explorer integration, Microsoft app authentication,
+and the Scanner API are locally verified with Ruff and pytest: 223 tests pass.
 The only known test-suite warning is a third-party FastAPI/TestClient warning
 about Starlette's `httpx` integration.
 

@@ -15,6 +15,14 @@ FABRIC_RESOURCE = (
     "https://api.fabric.microsoft.com"
 )
 
+POWERBI_APPLICATION_SCOPE = (
+    f"{POWERBI_RESOURCE}/.default"
+)
+
+FABRIC_APPLICATION_SCOPE = (
+    f"{FABRIC_RESOURCE}/.default"
+)
+
 POWERBI_SCOPES = [
     f"{POWERBI_RESOURCE}/Workspace.Read.All",
     f"{POWERBI_RESOURCE}/Report.Read.All",
