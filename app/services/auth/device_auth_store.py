@@ -10,6 +10,8 @@ class DeviceAuthSession:
     tenant_id: str
     client_id: str
 
+    authentication_method: str = "device_code"
+
     flow: dict[str, Any] = field(
         default_factory=dict
     )

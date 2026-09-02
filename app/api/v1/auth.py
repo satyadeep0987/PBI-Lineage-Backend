@@ -1,6 +1,6 @@
+from fastapi import APIRouter, Cookie, Depends, Response
 
-from fastapi import APIRouter, Cookie, Response
-
+from app.api.dependencies.security import require_lineage_api_key
 from app.core.auth_session import (
     AUTH_SESSION_COOKIE,
     AUTH_SESSION_MAX_AGE_SECONDS,
@@ -20,6 +20,8 @@ from app.schemas.auth import (
     MicrosoftDeviceAuthRequest,
     MicrosoftDeviceAuthStartResponse,
     MicrosoftDeviceAuthStatusResponse,
+    MicrosoftServicePrincipalAuthRequest,
+    MicrosoftServicePrincipalAuthResponse,
     ProviderScopeAccess,
     ProviderTestResult,
 )
@@ -30,6 +32,9 @@ from app.services.auth.device_auth_store import (
 )
 from app.services.auth.microsoft_device_auth_service import (
     MicrosoftDeviceAuthService,
+)
+from app.services.auth.microsoft_service_principal_auth_service import (
+    MicrosoftServicePrincipalAuthService,
 )
 
 router = APIRouter()
@@ -347,3 +352,78 @@ async def logout_microsoft_device_session(
     return {
         "status": "logged_out"
     }
+
+
+@router.post(
+    "/microsoft/service-principal/session",
+    response_model=MicrosoftServicePrincipalAuthResponse,
+    dependencies=[Depends(require_lineage_api_key)],
+)
+async def authenticate_microsoft_service_principal(
+    request: MicrosoftServicePrincipalAuthRequest,
+    response: Response,
+    previous_session_id: str | None = Cookie(
+        default=None,
+        alias=AUTH_SESSION_COOKIE,
+    ),
+) -> MicrosoftServicePrincipalAuthResponse:
+    settings = get_settings()
+    service = MicrosoftServicePrincipalAuthService()
+    result = await service.authenticate(
+        tenant_id=request.tenant_id,
+        client_id=request.client_id,
+        client_secret=request.client_secret.get_secret_value(),
+    )
+
+    if previous_session_id and previous_session_id != result.session_id:
+        delete_device_session(previous_session_id)
+
+    response.set_cookie(
+        key=AUTH_SESSION_COOKIE,
+        value=result.session_id,
+        max_age=AUTH_SESSION_MAX_AGE_SECONDS,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite,
+        path="/",
+    )
+    return result
+
+
+@router.get(
+    "/microsoft/service-principal/session/status",
+    response_model=MicrosoftServicePrincipalAuthResponse,
+    dependencies=[Depends(require_lineage_api_key)],
+)
+async def get_microsoft_service_principal_status(
+    session_id: str | None = Cookie(
+        default=None,
+        alias=AUTH_SESSION_COOKIE,
+    ),
+) -> MicrosoftServicePrincipalAuthResponse:
+    if session_id is None:
+        raise AuthenticationSessionRequiredError()
+    return MicrosoftServicePrincipalAuthService().status(session_id)
+
+
+@router.delete(
+    "/microsoft/service-principal/session",
+    dependencies=[Depends(require_lineage_api_key)],
+)
+async def logout_microsoft_service_principal(
+    response: Response,
+    session_id: str | None = Cookie(
+        default=None,
+        alias=AUTH_SESSION_COOKIE,
+    ),
+) -> dict[str, str]:
+    settings = get_settings()
+    if session_id:
+        delete_device_session(session_id)
+    response.delete_cookie(
+        key=AUTH_SESSION_COOKIE,
+        path="/",
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite,
+    )
+    return {"status": "logged_out"}

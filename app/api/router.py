@@ -2,10 +2,12 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     auth,
+    explorer,
     gateways,
     health,
     lineage,
     reports,
+    scanner,
     snowflake_auth,
     workspaces,
 )
@@ -46,6 +48,18 @@ api_router.include_router(
     gateways.router,
     prefix="/gateways",
     tags=["Gateways"],
+)
+
+api_router.include_router(
+    explorer.router,
+    prefix="/explorer",
+    tags=["Explorer"],
+)
+
+api_router.include_router(
+    scanner.router,
+    prefix="/scanner",
+    tags=["Scanner"],
 )
 
 api_router.include_router(

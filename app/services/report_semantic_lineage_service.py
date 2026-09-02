@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
@@ -58,7 +59,7 @@ class ReportSemanticLineageService:
         report_definition_format: str | None = "PBIR",
         semantic_model_definition_format: str = "TMDL",
     ) -> ReportSemanticLineageResponse:
-        report = await (
+        report_task = (
             self.report_definition_service
             .get_normalized_definition(
                 workspace_id=workspace_id,
@@ -70,7 +71,7 @@ class ReportSemanticLineageService:
             )
         )
 
-        semantic_model = await (
+        semantic_model_task = (
             self.semantic_model_definition_service
             .get_parsed_definition(
                 workspace_id=(
@@ -82,6 +83,11 @@ class ReportSemanticLineageService:
                     semantic_model_definition_format
                 ),
             )
+        )
+
+        report, semantic_model = await asyncio.gather(
+            report_task,
+            semantic_model_task,
         )
 
         return self.match(
