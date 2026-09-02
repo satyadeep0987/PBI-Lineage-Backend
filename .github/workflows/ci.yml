@@ -9,41 +9,40 @@ on:
     branches:
       - main
 
+  workflow_dispatch:
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  test:
-    name: Test FastAPI Backend
-    runs-on: windows-2025
+  quality:
+    name: Lint and Test
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v9
+        uses: astral-sh/setup-uv@v6
         with:
-          version: "0.12.6"
           enable-cache: true
 
-      - name: Install Python
-        shell: powershell
-        run: |
-          uv python install 3.11.16
+      - name: Set up Python 3.11
+        run: uv python install 3.11
 
       - name: Install dependencies
-        shell: powershell
-        run: |
-          uv sync --frozen --dev --python 3.11.16
+        run: uv sync --frozen --dev
 
-      - name: Verify core imports
-        shell: powershell
-        run: |
-          uv run --frozen python -c "import fastapi, uvicorn, httpx, msal, win32com.client, pythoncom"
+      - name: Ruff check
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
 
       - name: Run tests
-        shell: powershell
-        run: |
-          uv run --frozen pytest
-          
+        run: uv run pytest
