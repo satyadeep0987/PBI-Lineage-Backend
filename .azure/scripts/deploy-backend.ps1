@@ -1,12 +1,12 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$Image,
+    [Parameter(Mandatory = $false)]
+    [string]$Image = "",
 
-    [Parameter(Mandatory = $true)]
-    [string]$AcrName,
+    [Parameter(Mandatory = $false)]
+    [string]$AcrName = "",
 
-    [Parameter(Mandatory = $true)]
-    [string]$KeyVaultName,
+    [Parameter(Mandatory = $false)]
+    [string]$KeyVaultName = "",
 
     [Parameter(Mandatory = $false)]
     [string]$ContainerName = "pbi-lineage-api",
@@ -20,10 +20,62 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ------------------------------------------------------------
-# Refresh machine PATH
-# Azure Run Command may inherit an old PATH from the VM Agent.
-# ------------------------------------------------------------
+# ============================================================
+# Validate parameters explicitly.
+#
+# Do NOT use Mandatory=$true for Azure Run Command parameters.
+# A missing mandatory parameter can cause PowerShell to wait
+# for interactive input instead of failing immediately.
+# ============================================================
+
+$RequiredParameters = @{
+    Image        = $Image
+    AcrName      = $AcrName
+    KeyVaultName = $KeyVaultName
+    ContainerName = $ContainerName
+}
+
+foreach ($Entry in $RequiredParameters.GetEnumerator()) {
+
+    if ([string]::IsNullOrWhiteSpace($Entry.Value)) {
+        throw (
+            "Required deployment parameter '$($Entry.Key)' " +
+            "was not provided."
+        )
+    }
+}
+
+if (
+    $HostPort -lt 1 -or
+    $HostPort -gt 65535
+) {
+    throw "HostPort is invalid: $HostPort"
+}
+
+if (
+    $ContainerPort -lt 1 -or
+    $ContainerPort -gt 65535
+) {
+    throw "ContainerPort is invalid: $ContainerPort"
+}
+
+Write-Host "========================================="
+Write-Host "PBI Lineage Backend Deployment"
+Write-Host "========================================="
+Write-Host "Image:       $Image"
+Write-Host "Container:   $ContainerName"
+Write-Host "ACR:         $AcrName"
+Write-Host "Key Vault:   $KeyVaultName"
+Write-Host "Host port:   $HostPort"
+Write-Host "Target port: $ContainerPort"
+
+# ============================================================
+# Refresh PATH
+#
+# Azure VM Run Command executes under the VM Agent process.
+# The agent can retain an older PATH than an interactive RDP
+# session.
+# ============================================================
 
 $MachinePath = [Environment]::GetEnvironmentVariable(
     "Path",
@@ -37,15 +89,16 @@ $UserPath = [Environment]::GetEnvironmentVariable(
 
 $env:Path = "$MachinePath;$UserPath;$env:Path"
 
-# ------------------------------------------------------------
-# Resolve Docker executable explicitly
-# ------------------------------------------------------------
+# ============================================================
+# Resolve Docker executable
+# ============================================================
 
 $DockerCommand = Get-Command `
     "docker.exe" `
     -ErrorAction SilentlyContinue
 
 if ($DockerCommand) {
+
     $DockerExe = $DockerCommand.Source
 }
 else {
@@ -56,7 +109,9 @@ else {
     )
 
     $DockerExe = $DockerCandidates |
-        Where-Object { Test-Path $_ } |
+        Where-Object {
+            Test-Path $_
+        } |
         Select-Object -First 1
 }
 
@@ -64,24 +119,26 @@ if (-not $DockerExe) {
     throw "docker.exe could not be located on the Azure VM."
 }
 
-Write-Host "Docker executable:"
+Write-Host "Docker:"
 Write-Host $DockerExe
 
-# ------------------------------------------------------------
-# Resolve Azure CLI explicitly
-# ------------------------------------------------------------
+# ============================================================
+# Resolve Azure CLI
+# ============================================================
 
 $AzCommand = Get-Command `
     "az.cmd" `
     -ErrorAction SilentlyContinue
 
 if (-not $AzCommand) {
+
     $AzCommand = Get-Command `
         "az.exe" `
         -ErrorAction SilentlyContinue
 }
 
 if ($AzCommand) {
+
     $AzExe = $AzCommand.Source
 }
 else {
@@ -92,7 +149,9 @@ else {
     )
 
     $AzExe = $AzCandidates |
-        Where-Object { Test-Path $_ } |
+        Where-Object {
+            Test-Path $_
+        } |
         Select-Object -First 1
 }
 
@@ -100,14 +159,12 @@ if (-not $AzExe) {
     throw "Azure CLI could not be located on the Azure VM."
 }
 
-Write-Host "Azure CLI executable:"
+Write-Host "Azure CLI:"
 Write-Host $AzExe
 
-Write-Host "========================================="
-Write-Host "PBI Lineage Backend Deployment"
-Write-Host "========================================="
-Write-Host "Image: $Image"
-Write-Host "Container: $ContainerName"
+# ============================================================
+# Application directories
+# ============================================================
 
 $AppRoot = "C:\pbi-lineage"
 $DataRoot = Join-Path $AppRoot "data"
@@ -118,23 +175,27 @@ foreach ($Directory in @(
     $DataRoot,
     $LogRoot
 )) {
+
     New-Item `
         -ItemType Directory `
         -Path $Directory `
-        -Force | Out-Null
+        -Force |
+        Out-Null
 }
 
-# ------------------------------------------------------------
-# Production configuration
-# ------------------------------------------------------------
+# ============================================================
+# Production runtime configuration
+# ============================================================
 
 $env:ENVIRONMENT = "production"
 $env:LOG_LEVEL = "INFO"
+
 $env:LINEAGE_DATABASE_PATH = "data/lineage.db"
 
 $env:SNOWFLAKE_ALLOW_EXTERNAL_BROWSER_AUTH = "false"
 
-# Pydantic list fields MUST remain valid JSON.
+# These fields are list[str] in Pydantic.
+# They MUST remain valid JSON strings.
 $env:CORS_ALLOWED_ORIGINS = '[]'
 
 $env:ALLOWED_HOSTS = (
@@ -144,18 +205,20 @@ $env:ALLOWED_HOSTS = (
     '"127.0.0.1"]'
 )
 
+# HTTPS terminates at Cloudflare/IIS.
 $env:FORCE_HTTPS = "false"
+
 $env:ENABLE_API_DOCS = "false"
 
 $env:AUTH_COOKIE_SECURE = "true"
 $env:AUTH_COOKIE_SAMESITE = "lax"
 
-# ------------------------------------------------------------
-# Docker
-# ------------------------------------------------------------
+# ============================================================
+# Ensure Docker daemon is running
+# ============================================================
 
 $DockerService = Get-Service `
-    -Name docker `
+    -Name "docker" `
     -ErrorAction SilentlyContinue
 
 if (-not $DockerService) {
@@ -166,18 +229,23 @@ if ($DockerService.Status -ne "Running") {
 
     Write-Host "Starting Docker service..."
 
-    Start-Service docker
+    Start-Service `
+        -Name "docker"
 }
 
 $DockerReady = $false
 
 for ($Attempt = 1; $Attempt -le 12; $Attempt++) {
 
-    Write-Host "Docker readiness attempt $Attempt/12"
+    Write-Host (
+        "Docker readiness attempt " +
+        "$Attempt/12"
+    )
 
     & $DockerExe info *> $null
 
     if ($LASTEXITCODE -eq 0) {
+
         $DockerReady = $true
         break
     }
@@ -192,18 +260,46 @@ if (-not $DockerReady) {
 & $DockerExe version
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Docker is not available."
+    throw "Docker daemon validation failed."
 }
 
-# ------------------------------------------------------------
-# VM Managed Identity -> ACR
-# ------------------------------------------------------------
+$DockerOsType = & $DockerExe info `
+    --format "{{.OSType}}"
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to determine Docker OS type."
+}
+
+if ($DockerOsType.Trim() -ne "windows") {
+    throw (
+        "Windows Docker daemon required. " +
+        "Detected '$DockerOsType'."
+    )
+}
+
+Write-Host "Windows Docker daemon ready."
+
+# ============================================================
+# Authenticate VM Managed Identity
+# ============================================================
 
 Write-Host "Authenticating VM managed identity..."
 
 & $AzExe login `
     --identity `
     --output none
+
+$AzLoginExitCode = $LASTEXITCODE
+
+if ($AzLoginExitCode -ne 0) {
+    throw "VM managed identity login failed."
+}
+
+Write-Host "Managed identity authentication succeeded."
+
+# ============================================================
+# Retrieve production secret from Key Vault
+# ============================================================
 
 Write-Host "Loading backend production secrets..."
 
@@ -213,48 +309,78 @@ $LineageAdminApiKey = & $AzExe keyvault secret show `
     --query value `
     --output tsv
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Unable to retrieve LINEAGE_ADMIN_API_KEY from Key Vault."
+$KeyVaultExitCode = $LASTEXITCODE
+
+if ($KeyVaultExitCode -ne 0) {
+    throw (
+        "Unable to retrieve LINEAGE_ADMIN_API_KEY " +
+        "from Key Vault '$KeyVaultName'."
+    )
 }
 
+$LineageAdminApiKey = (
+    $LineageAdminApiKey |
+        Out-String
+).Trim()
+
 if ([string]::IsNullOrWhiteSpace($LineageAdminApiKey)) {
-    throw "LINEAGE_ADMIN_API_KEY retrieved from Key Vault is empty."
+    throw (
+        "LINEAGE_ADMIN_API_KEY retrieved from " +
+        "Key Vault is empty."
+    )
 }
 
 $env:LINEAGE_ADMIN_API_KEY = $LineageAdminApiKey
 
 Write-Host "Backend production secrets loaded successfully."
 
-if ($LASTEXITCODE -ne 0) {
-    throw "VM managed identity login failed."
-}
+# Never print LINEAGE_ADMIN_API_KEY.
 
-Write-Host "Authenticating to ACR..."
+# ============================================================
+# Authenticate to ACR
+# ============================================================
+
+Write-Host "Authenticating to Azure Container Registry..."
 
 & $AzExe acr login `
     --name $AcrName
 
-if ($LASTEXITCODE -ne 0) {
+$AcrLoginExitCode = $LASTEXITCODE
+
+if ($AcrLoginExitCode -ne 0) {
     throw "ACR login failed."
 }
 
-Write-Host "Pulling image..."
+Write-Host "ACR authentication succeeded."
+
+# ============================================================
+# Pull target image
+# ============================================================
+
+Write-Host "Pulling backend image..."
+Write-Host $Image
 
 & $DockerExe pull $Image
 
-if ($LASTEXITCODE -ne 0) {
+$PullExitCode = $LASTEXITCODE
+
+if ($PullExitCode -ne 0) {
     throw "Failed to pull backend image."
 }
 
-# ------------------------------------------------------------
-# Container helper
-# ------------------------------------------------------------
+# ============================================================
+# Container helpers
+# ============================================================
 
 function Start-BackendContainer {
+
     param(
         [Parameter(Mandatory = $true)]
         [string]$TargetImage
     )
+
+    Write-Host "Starting container from:"
+    Write-Host $TargetImage
 
     & $DockerExe run `
         --detach `
@@ -275,8 +401,13 @@ function Start-BackendContainer {
         --env LINEAGE_ADMIN_API_KEY `
         $TargetImage
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to start backend container."
+    $RunExitCode = $LASTEXITCODE
+
+    if ($RunExitCode -ne 0) {
+        throw (
+            "Failed to start backend container " +
+            "from image '$TargetImage'."
+        )
     }
 }
 
@@ -292,32 +423,60 @@ function Test-BackendHealth {
         "$HostPort/api/v1/health/ready"
     )
 
-    for ($Attempt = 1; $Attempt -le 12; $Attempt++) {
+    for ($Attempt = 1; $Attempt -le 18; $Attempt++) {
+
+        Write-Host (
+            "Backend health attempt " +
+            "$Attempt/18"
+        )
+
+        $LivePassed = $false
+        $ReadyPassed = $false
 
         try {
 
-            $Live = Invoke-WebRequest `
+            $LiveResponse = Invoke-WebRequest `
                 -Uri $LiveUrl `
                 -UseBasicParsing `
                 -TimeoutSec 10
 
-            $Ready = Invoke-WebRequest `
+            if ($LiveResponse.StatusCode -eq 200) {
+                $LivePassed = $true
+            }
+        }
+        catch {
+
+            Write-Host "Liveness check not ready yet."
+        }
+
+        try {
+
+            $ReadyResponse = Invoke-WebRequest `
                 -Uri $ReadyUrl `
                 -UseBasicParsing `
                 -TimeoutSec 10
 
-            if (
-                $Live.StatusCode -eq 200 -and
-                $Ready.StatusCode -eq 200
-            ) {
-                return $true
+            if ($ReadyResponse.StatusCode -eq 200) {
+                $ReadyPassed = $true
             }
         }
         catch {
-            Write-Host (
-                "Health attempt $Attempt failed. " +
-                "Retrying..."
-            )
+
+            Write-Host "Readiness check not ready yet."
+        }
+
+        Write-Host (
+            "Health state: " +
+            "live=$LivePassed, " +
+            "ready=$ReadyPassed"
+        )
+
+        if (
+            $LivePassed -and
+            $ReadyPassed
+        ) {
+
+            return $true
         }
 
         Start-Sleep -Seconds 5
@@ -326,9 +485,29 @@ function Test-BackendHealth {
     return $false
 }
 
-# ------------------------------------------------------------
-# Preserve previous deployment
-# ------------------------------------------------------------
+function Write-BackendDiagnostics {
+
+    Write-Host ""
+    Write-Host "Backend container diagnostics"
+    Write-Host "-----------------------------------------"
+
+    & $DockerExe ps `
+        -a `
+        --filter "name=^/$ContainerName$"
+
+    Write-Host ""
+    Write-Host "Last backend logs:"
+    Write-Host "-----------------------------------------"
+
+    & $DockerExe logs `
+        --tail 200 `
+        $ContainerName `
+        2>$null
+}
+
+# ============================================================
+# Preserve currently deployed image
+# ============================================================
 
 $PreviousImage = $null
 
@@ -337,27 +516,52 @@ $ExistingContainer = & $DockerExe ps `
     --filter "name=^/$ContainerName$" `
     --format "{{.ID}}"
 
-if ($ExistingContainer) {
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to inspect existing backend containers."
+}
+
+$ExistingContainer = (
+    $ExistingContainer |
+        Out-String
+).Trim()
+
+if (-not [string]::IsNullOrWhiteSpace($ExistingContainer)) {
 
     $PreviousImage = & $DockerExe inspect `
         --format "{{.Config.Image}}" `
         $ContainerName
 
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to determine previous backend image."
+    }
+
+    $PreviousImage = (
+        $PreviousImage |
+            Out-String
+    ).Trim()
+
     Write-Host "Previous image:"
     Write-Host $PreviousImage
+
+    Write-Host "Removing existing backend container..."
 
     & $DockerExe rm `
         --force `
         $ContainerName
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to remove existing backend container."
+    }
 }
 
-# ------------------------------------------------------------
-# Deploy
-# ------------------------------------------------------------
+# ============================================================
+# Deploy new image
+# ============================================================
 
 try {
 
-    Write-Host "Starting new backend container..."
+    Write-Host ""
+    Write-Host "Deploying new backend image..."
 
     Start-BackendContainer `
         -TargetImage $Image
@@ -365,20 +569,26 @@ try {
     Write-Host "Waiting for backend health..."
 
     if (-not (Test-BackendHealth)) {
+
+        Write-BackendDiagnostics
+
         throw "Backend health validation failed."
     }
 
+    Write-Host ""
     Write-Host "Backend health checks passed."
 }
 catch {
 
+    $DeploymentError = $_
+
     Write-Host ""
     Write-Host "New backend deployment failed."
 
-    & $DockerExe logs `
-        --tail 200 `
-        $ContainerName `
-        2>$null
+    Write-BackendDiagnostics
+
+    Write-Host ""
+    Write-Host "Removing failed backend container..."
 
     & $DockerExe rm `
         --force `
@@ -387,25 +597,89 @@ catch {
 
     if ($PreviousImage) {
 
+        Write-Host ""
         Write-Host "Rolling back to:"
         Write-Host $PreviousImage
 
-        Start-BackendContainer `
-            -TargetImage $PreviousImage
+        try {
 
-        if (-not (Test-BackendHealth)) {
+            Start-BackendContainer `
+                -TargetImage $PreviousImage
+
+            Write-Host "Validating rollback..."
+
+            if (-not (Test-BackendHealth)) {
+
+                Write-BackendDiagnostics
+
+                throw (
+                    "Rollback container failed " +
+                    "health validation."
+                )
+            }
+
+            Write-Host ""
+            Write-Host "Rollback completed successfully."
+            Write-Host "DEPLOYMENT_RESULT=ROLLED_BACK"
+        }
+        catch {
+
+            Write-Host ""
+            Write-Host "Rollback failed."
+
+            Write-BackendDiagnostics
+
             throw (
                 "New deployment failed and rollback " +
                 "also failed health validation."
             )
         }
+    }
+    else {
 
-        Write-Host "Rollback completed successfully."
+        Write-Host (
+            "No previous backend image was available " +
+            "for rollback."
+        )
     }
 
-    throw
+    throw $DeploymentError
+}
+
+# ============================================================
+# Final verification
+# ============================================================
+
+$RunningImage = & $DockerExe inspect `
+    --format "{{.Config.Image}}" `
+    $ContainerName
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to inspect deployed backend container."
+}
+
+$RunningImage = (
+    $RunningImage |
+        Out-String
+).Trim()
+
+if ($RunningImage -ne $Image) {
+    throw (
+        "Deployment image verification failed. " +
+        "Expected '$Image', running '$RunningImage'."
+    )
 }
 
 Write-Host ""
-Write-Host "Backend deployment completed successfully."
+Write-Host "========================================="
+Write-Host "Backend deployment completed successfully"
+Write-Host "========================================="
+Write-Host "Image:"
+Write-Host $RunningImage
+
 Write-Host "DEPLOYMENT_RESULT=SUCCESS"
+
+# Remove the secret from the Run Command process environment.
+Remove-Item `
+    Env:LINEAGE_ADMIN_API_KEY `
+    -ErrorAction SilentlyContinue
