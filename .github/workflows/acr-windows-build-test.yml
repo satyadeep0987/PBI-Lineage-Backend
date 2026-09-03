@@ -22,6 +22,7 @@ jobs:
     env:
       ACR_NAME: ${{ vars.ACR_NAME }}
       ACR_REPOSITORY: ${{ vars.ACR_REPOSITORY }}
+      MSOLAP_MSI_URL: ${{ vars.MSOLAP_MSI_URL }}
 
     steps:
       - name: Checkout repository
