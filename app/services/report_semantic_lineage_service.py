@@ -33,20 +33,13 @@ class _LineageMatchResult:
     semantic_object: SemanticLineageObject | None = None
     reason: str | None = None
     match_confidence: float = 0.0
-    candidate_suggestions: tuple[
-        SemanticLineageCandidate,
-        ...
-    ] = ()
+    candidate_suggestions: tuple[SemanticLineageCandidate, ...] = ()
 
 
 class ReportSemanticLineageService:
     def __init__(self) -> None:
-        self.report_definition_service = (
-            ReportDefinitionService()
-        )
-        self.semantic_model_definition_service = (
-            SemanticModelDefinitionService()
-        )
+        self.report_definition_service = ReportDefinitionService()
+        self.semantic_model_definition_service = SemanticModelDefinitionService()
 
     async def build_lineage(
         self,
@@ -59,29 +52,19 @@ class ReportSemanticLineageService:
         report_definition_format: str | None = "PBIR",
         semantic_model_definition_format: str = "TMDL",
     ) -> ReportSemanticLineageResponse:
-        report_task = (
-            self.report_definition_service
-            .get_normalized_definition(
-                workspace_id=workspace_id,
-                report_id=report_id,
-                access_token=access_token,
-                definition_format=(
-                    report_definition_format
-                ),
-            )
+        report_task = self.report_definition_service.get_normalized_definition(
+            workspace_id=workspace_id,
+            report_id=report_id,
+            access_token=access_token,
+            definition_format=(report_definition_format),
         )
 
         semantic_model_task = (
-            self.semantic_model_definition_service
-            .get_parsed_definition(
-                workspace_id=(
-                    semantic_model_workspace_id
-                ),
+            self.semantic_model_definition_service.get_parsed_definition(
+                workspace_id=(semantic_model_workspace_id),
                 semantic_model_id=semantic_model_id,
                 access_token=access_token,
-                definition_format=(
-                    semantic_model_definition_format
-                ),
+                definition_format=(semantic_model_definition_format),
             )
         )
 
@@ -93,9 +76,7 @@ class ReportSemanticLineageService:
         return self.match(
             report=report,
             semantic_model=semantic_model,
-            semantic_model_workspace_id=(
-                semantic_model_workspace_id
-            ),
+            semantic_model_workspace_id=(semantic_model_workspace_id),
         )
 
     def match(
@@ -105,116 +86,62 @@ class ReportSemanticLineageService:
         semantic_model: ParsedSemanticModelResponse,
         semantic_model_workspace_id: str,
     ) -> ReportSemanticLineageResponse:
-        index = _SemanticModelIndex(
-            semantic_model
-        )
+        index = _SemanticModelIndex(semantic_model)
 
-        field_matches: list[
-            SemanticLineageFieldMatch
-        ] = []
+        field_matches: list[SemanticLineageFieldMatch] = []
 
         for page in report.pages:
             for visual in page.visuals:
-                for field_reference in (
-                    visual.field_references
-                ):
-                    match_result = index.find(
-                        field_reference
-                    )
+                for field_reference in visual.field_references:
+                    match_result = index.find(field_reference)
 
                     status = (
                         "matched"
-                        if (
-                            match_result
-                            .semantic_object
-                            is not None
-                        )
+                        if (match_result.semantic_object is not None)
                         else "unmatched"
                     )
 
                     field_matches.append(
                         SemanticLineageFieldMatch(
                             page_name=page.name,
-                            page_display_name=(
-                                page.display_name
-                            ),
+                            page_display_name=(page.display_name),
                             visual_id=visual.id,
-                            visual_title=(
-                                visual.title
-                            ),
-                            visual_type=(
-                                visual.visual_type
-                            ),
-                            field_reference=(
-                                field_reference
-                            ),
+                            visual_title=(visual.title),
+                            visual_type=(visual.visual_type),
+                            field_reference=(field_reference),
                             status=status,
-                            semantic_object=(
-                                match_result
-                                .semantic_object
-                            ),
-                            reason=(
-                                match_result.reason
-                            ),
-                            match_confidence=(
-                                match_result
-                                .match_confidence
-                            ),
+                            semantic_object=(match_result.semantic_object),
+                            reason=(match_result.reason),
+                            match_confidence=(match_result.match_confidence),
                             candidate_suggestions=list(
-                                match_result
-                                .candidate_suggestions
+                                match_result.candidate_suggestions
                             ),
                         )
                     )
 
         matched_count = sum(
-            1
-            for field_match in field_matches
-            if field_match.status == "matched"
+            1 for field_match in field_matches if field_match.status == "matched"
         )
 
-        warnings = list(
-            report.warnings
-        )
-        warnings.extend(
-            self._semantic_model_warnings(
-                semantic_model
-            )
-        )
+        warnings = list(report.warnings)
+        warnings.extend(self._semantic_model_warnings(semantic_model))
 
         return ReportSemanticLineageResponse(
             workspace_id=report.workspace_id,
             report_id=report.report_id,
-            semantic_model_workspace_id=(
-                semantic_model_workspace_id
-            ),
-            semantic_model_id=(
-                semantic_model.semantic_model_id
-            ),
-            total_field_reference_count=len(
-                field_matches
-            ),
-            matched_field_reference_count=(
-                matched_count
-            ),
-            unmatched_field_reference_count=(
-                len(field_matches)
-                - matched_count
-            ),
+            semantic_model_workspace_id=(semantic_model_workspace_id),
+            semantic_model_id=(semantic_model.semantic_model_id),
+            total_field_reference_count=len(field_matches),
+            matched_field_reference_count=(matched_count),
+            unmatched_field_reference_count=(len(field_matches) - matched_count),
             field_matches=field_matches,
-            diagnostics_summary=(
-                self._build_diagnostics_summary(
-                    field_matches
-                )
-            ),
+            diagnostics_summary=(self._build_diagnostics_summary(field_matches)),
             warnings=warnings,
         )
 
     @staticmethod
     def _build_diagnostics_summary(
-        field_matches: list[
-            SemanticLineageFieldMatch
-        ],
+        field_matches: list[SemanticLineageFieldMatch],
     ) -> SemanticLineageDiagnosticsSummary:
         status_counts = {
             "matched": 0,
@@ -228,18 +155,10 @@ class ReportSemanticLineageService:
         reason_counts: dict[str, int] = {}
 
         for field_match in field_matches:
-            status_counts[
-                field_match.status
-            ] += 1
+            status_counts[field_match.status] += 1
 
-            object_type = (
-                field_match
-                .field_reference
-                .object_type
-            )
-            object_type_counts[
-                object_type
-            ] = (
+            object_type = field_match.field_reference.object_type
+            object_type_counts[object_type] = (
                 object_type_counts.get(
                     object_type,
                     0,
@@ -256,9 +175,7 @@ class ReportSemanticLineageService:
             )[field_match.status] += 1
 
             if field_match.reason:
-                reason_counts[
-                    field_match.reason
-                ] = (
+                reason_counts[field_match.reason] = (
                     reason_counts.get(
                         field_match.reason,
                         0,
@@ -268,22 +185,12 @@ class ReportSemanticLineageService:
 
         return SemanticLineageDiagnosticsSummary(
             status_counts=status_counts,
-            field_reference_object_type_counts=dict(
-                sorted(
-                    object_type_counts.items()
-                )
-            ),
+            field_reference_object_type_counts=dict(sorted(object_type_counts.items())),
             match_counts_by_object_type={
                 object_type: counts
-                for object_type, counts in sorted(
-                    match_counts.items()
-                )
+                for object_type, counts in sorted(match_counts.items())
             },
-            reason_counts=dict(
-                sorted(
-                    reason_counts.items()
-                )
-            ),
+            reason_counts=dict(sorted(reason_counts.items())),
         )
 
     @staticmethod
@@ -293,16 +200,10 @@ class ReportSemanticLineageService:
         warnings: list[str] = []
 
         for warning in semantic_model.warnings:
-            message = (
-                f"{warning.code}: "
-                f"{warning.message}"
-            )
+            message = f"{warning.code}: {warning.message}"
 
             if warning.path:
-                message = (
-                    f"{message} "
-                    f"({warning.path})"
-                )
+                message = f"{message} ({warning.path})"
 
             warnings.append(message)
 
@@ -314,33 +215,12 @@ class _SemanticModelIndex:
         self,
         semantic_model: ParsedSemanticModelResponse,
     ) -> None:
-        self.tables = {
-            _key(table.name): table
-            for table in semantic_model.tables
-        }
-        self.columns = (
-            self._build_column_index(
-                semantic_model
-            )
-        )
-        self.measures = (
-            self._build_measure_index(
-                semantic_model
-            )
-        )
-        self.hierarchies = (
-            self._build_hierarchy_index(
-                semantic_model
-            )
-        )
-        self.hierarchy_levels = (
-            self._build_hierarchy_level_index(
-                semantic_model
-            )
-        )
-        self.objects_by_type = (
-            self._build_objects_by_type()
-        )
+        self.tables = {_key(table.name): table for table in semantic_model.tables}
+        self.columns = self._build_column_index(semantic_model)
+        self.measures = self._build_measure_index(semantic_model)
+        self.hierarchies = self._build_hierarchy_index(semantic_model)
+        self.hierarchy_levels = self._build_hierarchy_level_index(semantic_model)
+        self.objects_by_type = self._build_objects_by_type()
 
     def find(
         self,
@@ -404,10 +284,7 @@ class _SemanticModelIndex:
             )
 
         if reference.object_type == "hierarchy":
-            hierarchy_name = (
-                reference.hierarchy_name
-                or object_name
-            )
+            hierarchy_name = reference.hierarchy_name or object_name
 
             if not hierarchy_name:
                 return self._unmatched_result(
@@ -430,10 +307,7 @@ class _SemanticModelIndex:
 
         if reference.object_type == "hierarchy_level":
             hierarchy_name = reference.hierarchy_name
-            level_name = (
-                reference.level_name
-                or object_name
-            )
+            level_name = reference.level_name or object_name
 
             if not hierarchy_name:
                 return self._unmatched_result(
@@ -500,22 +374,14 @@ class _SemanticModelIndex:
     ) -> _LineageMatchResult:
         return _LineageMatchResult(
             reason=reason,
-            candidate_suggestions=tuple(
-                self._candidate_suggestions(
-                    reference
-                )
-            ),
+            candidate_suggestions=tuple(self._candidate_suggestions(reference)),
         )
 
     def _candidate_suggestions(
         self,
         reference: VisualFieldReference,
     ) -> list[SemanticLineageCandidate]:
-        requested_name = (
-            self._reference_object_name(
-                reference
-            )
-        )
+        requested_name = self._reference_object_name(reference)
 
         if not requested_name:
             return []
@@ -540,20 +406,10 @@ class _SemanticModelIndex:
             if candidate is None:
                 continue
 
-            identity = (
-                self._semantic_object_identity(
-                    candidate.semantic_object
-                )
-            )
-            current = suggestions.get(
-                identity
-            )
+            identity = self._semantic_object_identity(candidate.semantic_object)
+            current = suggestions.get(identity)
 
-            if (
-                current is None
-                or candidate.confidence
-                > current.confidence
-            ):
+            if current is None or candidate.confidence > current.confidence:
                 suggestions[identity] = candidate
 
         return sorted(
@@ -569,22 +425,12 @@ class _SemanticModelIndex:
         semantic_object: SemanticLineageObject,
     ) -> SemanticLineageCandidate | None:
         requested_table_key = (
-            _key(reference.table_name)
-            if reference.table_name
-            else None
+            _key(reference.table_name) if reference.table_name else None
         )
-        candidate_table_key = _key(
-            semantic_object.table_name
-        )
+        candidate_table_key = _key(semantic_object.table_name)
 
-        table_matches = (
-            requested_table_key
-            == candidate_table_key
-        )
-        object_matches = (
-            _key(requested_name)
-            == _key(semantic_object.object_name)
-        )
+        table_matches = requested_table_key == candidate_table_key
+        object_matches = _key(requested_name) == _key(semantic_object.object_name)
         object_similarity = _similarity(
             requested_name,
             semantic_object.object_name,
@@ -596,9 +442,7 @@ class _SemanticModelIndex:
                 confidence=round(
                     min(
                         0.9,
-                        0.55
-                        + object_similarity
-                        * 0.35,
+                        0.55 + object_similarity * 0.35,
                     ),
                     2,
                 ),
@@ -620,22 +464,13 @@ class _SemanticModelIndex:
             semantic_object.table_name,
         )
 
-        if (
-            table_similarity >= 0.75
-            and object_similarity >= 0.5
-        ):
+        if table_similarity >= 0.75 and object_similarity >= 0.5:
             return SemanticLineageCandidate(
                 semantic_object=semantic_object,
                 confidence=round(
                     min(
                         0.7,
-                        0.35
-                        + (
-                            table_similarity
-                            + object_similarity
-                        )
-                        / 2
-                        * 0.35,
+                        0.35 + (table_similarity + object_similarity) / 2 * 0.35,
                     ),
                     2,
                 ),
@@ -668,20 +503,14 @@ class _SemanticModelIndex:
                 objects_by_type.setdefault(
                     semantic_object.object_type,
                     {},
-                )[
-                    self._semantic_object_identity(
-                        semantic_object
-                    )
-                ] = semantic_object
+                )[self._semantic_object_identity(semantic_object)] = semantic_object
 
         return {
             object_type: sorted(
                 values.values(),
                 key=self._semantic_object_sort_key,
             )
-            for object_type, values in (
-                objects_by_type.items()
-            )
+            for object_type, values in (objects_by_type.items())
         }
 
     @staticmethod
@@ -689,16 +518,10 @@ class _SemanticModelIndex:
         reference: VisualFieldReference,
     ) -> str | None:
         if reference.object_type == "hierarchy":
-            return (
-                reference.hierarchy_name
-                or reference.object_name
-            )
+            return reference.hierarchy_name or reference.object_name
 
         if reference.object_type == "hierarchy_level":
-            return (
-                reference.level_name
-                or reference.object_name
-            )
+            return reference.level_name or reference.object_name
 
         return reference.object_name
 
@@ -710,14 +533,8 @@ class _SemanticModelIndex:
             semantic_object.object_type,
             _key(semantic_object.table_name),
             _key(semantic_object.object_name),
-            _key(
-                semantic_object.hierarchy_name
-                or ""
-            ),
-            _key(
-                semantic_object.level_name
-                or ""
-            ),
+            _key(semantic_object.hierarchy_name or ""),
+            _key(semantic_object.level_name or ""),
         )
 
     @staticmethod
@@ -726,15 +543,9 @@ class _SemanticModelIndex:
     ) -> tuple[str, str, str, str]:
         return (
             _key(semantic_object.table_name),
-            _key(
-                semantic_object.hierarchy_name
-                or ""
-            ),
+            _key(semantic_object.hierarchy_name or ""),
             _key(semantic_object.object_name),
-            _key(
-                semantic_object.level_name
-                or ""
-            ),
+            _key(semantic_object.level_name or ""),
         )
 
     @staticmethod
@@ -746,15 +557,9 @@ class _SemanticModelIndex:
         return (
             -candidate.confidence,
             _key(semantic_object.table_name),
-            _key(
-                semantic_object.hierarchy_name
-                or ""
-            ),
+            _key(semantic_object.hierarchy_name or ""),
             _key(semantic_object.object_name),
-            _key(
-                semantic_object.level_name
-                or ""
-            ),
+            _key(semantic_object.level_name or ""),
         )
 
     @staticmethod
@@ -771,16 +576,11 @@ class _SemanticModelIndex:
 
         for table in semantic_model.tables:
             for column in table.columns:
-                lineage_object = (
-                    SemanticLineageObject(
-                        object_type="column",
-                        table_name=table.name,
-                        object_name=column.name,
-                        source_path=(
-                            column.source_path
-                            or table.source_path
-                        ),
-                    )
+                lineage_object = SemanticLineageObject(
+                    object_type="column",
+                    table_name=table.name,
+                    object_name=column.name,
+                    source_path=(column.source_path or table.source_path),
                 )
 
                 index[
@@ -794,9 +594,7 @@ class _SemanticModelIndex:
                     index.setdefault(
                         (
                             _key(table.name),
-                            _key(
-                                column.source_column
-                            ),
+                            _key(column.source_column),
                         ),
                         lineage_object,
                     )
@@ -826,10 +624,7 @@ class _SemanticModelIndex:
                     object_type="measure",
                     table_name=table.name,
                     object_name=measure.name,
-                    source_path=(
-                        measure.source_path
-                        or table.source_path
-                    ),
+                    source_path=(measure.source_path or table.source_path),
                 )
 
         return index
@@ -857,10 +652,7 @@ class _SemanticModelIndex:
                     object_type="hierarchy",
                     table_name=table.name,
                     object_name=hierarchy.name,
-                    source_path=(
-                        hierarchy.source_path
-                        or table.source_path
-                    ),
+                    source_path=(hierarchy.source_path or table.source_path),
                     hierarchy_name=hierarchy.name,
                 )
 
@@ -918,9 +710,7 @@ class _SemanticModelIndex:
                 table_name=table.name,
                 object_name=level.name,
                 source_path=(
-                    level.source_path
-                    or hierarchy.source_path
-                    or table.source_path
+                    level.source_path or hierarchy.source_path or table.source_path
                 ),
                 hierarchy_name=hierarchy.name,
                 level_name=level.name,

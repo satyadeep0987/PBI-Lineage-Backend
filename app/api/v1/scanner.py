@@ -14,9 +14,7 @@ from app.schemas.scanner import (
 )
 from app.services.scanner_service import ScannerService
 
-router = APIRouter(
-    dependencies=[Depends(require_lineage_api_key)]
-)
+router = APIRouter(dependencies=[Depends(require_lineage_api_key)])
 
 
 @router.get(

@@ -15,17 +15,13 @@ from app.schemas.parsed_semantic_model import (
 )
 from app.schemas.semantic_model_definition import SemanticModelDefinitionResponse
 
-FIELD_REFERENCE_PATTERN = re.compile(
-    r"^'?(?P<table>[^'\[]+)'?\[(?P<field>[^\]]+)\]$"
-)
+FIELD_REFERENCE_PATTERN = re.compile(r"^'?(?P<table>[^'\[]+)'?\[(?P<field>[^\]]+)\]$")
 TMDL_FIELD_REFERENCE_PATTERN = re.compile(
     r"^(?P<table>'(?:[^']|'')+'|[^.]+)\."
     r"(?P<field>'(?:[^']|'')+'|[^.]+)$"
 )
 
-PROPERTY_KEY_PATTERN = re.compile(
-    r"^[A-Za-z][A-Za-z0-9]*$"
-)
+PROPERTY_KEY_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
 
 
 class SemanticModelDefinitionParser:
@@ -109,9 +105,7 @@ class SemanticModelDefinitionParser:
                 if "=" in declaration and expression is None:
                     expression = ""
                 current_table = ParsedSemanticModelTable(
-                    name=self._clean_name(
-                        table_name
-                    ),
+                    name=self._clean_name(table_name),
                     source_path=source_path,
                     expression=expression,
                 )
@@ -125,16 +119,10 @@ class SemanticModelDefinitionParser:
                 continue
 
             if line.startswith("relationship"):
-                name = self._clean_optional_name(
-                    line.removeprefix(
-                        "relationship"
-                    )
-                )
-                current_relationship = (
-                    ParsedSemanticModelRelationship(
-                        name=name,
-                        source_path=source_path,
-                    )
+                name = self._clean_optional_name(line.removeprefix("relationship"))
+                current_relationship = ParsedSemanticModelRelationship(
+                    name=name,
+                    source_path=source_path,
                 )
                 result.relationships.append(current_relationship)
                 current_table = None
@@ -180,9 +168,7 @@ class SemanticModelDefinitionParser:
 
             if current_table and line.startswith("hierarchy "):
                 current_hierarchy = ParsedSemanticModelHierarchy(
-                    name=self._clean_name(
-                        line.removeprefix("hierarchy ")
-                    ),
+                    name=self._clean_name(line.removeprefix("hierarchy ")),
                     source_path=source_path,
                 )
                 current_table.hierarchies.append(current_hierarchy)
@@ -211,9 +197,7 @@ class SemanticModelDefinitionParser:
             if current_hierarchy and line.startswith("level "):
                 current_hierarchy.levels.append(
                     ParsedSemanticModelHierarchyLevel(
-                        name=self._clean_name(
-                            line.removeprefix("level ")
-                        ),
+                        name=self._clean_name(line.removeprefix("level ")),
                         source_path=source_path,
                     )
                 )
@@ -249,17 +233,12 @@ class SemanticModelDefinitionParser:
 
                 if (
                     not applied
-                    and not self._looks_like_property_key(
-                        key
-                    )
-                    and current_column.expression
-                    is not None
+                    and not self._looks_like_property_key(key)
+                    and current_column.expression is not None
                 ):
-                    current_column.expression = (
-                        self._append_expression(
-                            current_column.expression,
-                            line,
-                        )
+                    current_column.expression = self._append_expression(
+                        current_column.expression,
+                        line,
                     )
             elif current_measure:
                 applied = self._apply_measure_property(
@@ -268,23 +247,14 @@ class SemanticModelDefinitionParser:
                     value,
                 )
 
-                if (
-                    not applied
-                    and not self._looks_like_property_key(
-                        key
-                    )
-                ):
-                    current_measure.expression = (
-                        self._append_expression(
-                            current_measure.expression,
-                            line,
-                        )
+                if not applied and not self._looks_like_property_key(key):
+                    current_measure.expression = self._append_expression(
+                        current_measure.expression,
+                        line,
                     )
             elif current_hierarchy and current_hierarchy.levels:
                 if key == "column":
-                    current_hierarchy.levels[-1].column = (
-                        self._clean_name(value)
-                    )
+                    current_hierarchy.levels[-1].column = self._clean_name(value)
             elif current_relationship:
                 self._apply_relationship_property(current_relationship, key, value)
             elif (
@@ -330,11 +300,7 @@ class SemanticModelDefinitionParser:
     def _clean_name(value: str) -> str:
         cleaned = value.strip()
 
-        if (
-            len(cleaned) >= 2
-            and cleaned.startswith("'")
-            and cleaned.endswith("'")
-        ):
+        if len(cleaned) >= 2 and cleaned.startswith("'") and cleaned.endswith("'"):
             cleaned = cleaned[1:-1]
 
         return cleaned.replace(
@@ -372,16 +338,11 @@ class SemanticModelDefinitionParser:
     def _looks_like_property_key(
         key: str,
     ) -> bool:
-        return bool(
-            key
-            and PROPERTY_KEY_PATTERN.match(key)
-        )
+        return bool(key and PROPERTY_KEY_PATTERN.match(key))
 
     @staticmethod
     def _parse_field_reference(value: str) -> tuple[str | None, str | None]:
-        match = FIELD_REFERENCE_PATTERN.match(
-            value.strip()
-        )
+        match = FIELD_REFERENCE_PATTERN.match(value.strip())
 
         if not match:
             match = TMDL_FIELD_REFERENCE_PATTERN.match(value.strip())
@@ -390,14 +351,8 @@ class SemanticModelDefinitionParser:
             return None, None
 
         return (
-            SemanticModelDefinitionParser
-            ._clean_name(
-                match.group("table")
-            ),
-            SemanticModelDefinitionParser
-            ._clean_name(
-                match.group("field")
-            ),
+            SemanticModelDefinitionParser._clean_name(match.group("table")),
+            SemanticModelDefinitionParser._clean_name(match.group("field")),
         )
 
     def _apply_column_property(
@@ -411,9 +366,7 @@ class SemanticModelDefinitionParser:
             return True
 
         if key == "sourceColumn":
-            column.source_column = self._clean_name(
-                value
-            )
+            column.source_column = self._clean_name(value)
             return True
 
         if key == "expression":
@@ -437,9 +390,7 @@ class SemanticModelDefinitionParser:
             return True
 
         if key == "formatString":
-            measure.format_string = self._clean_name(
-                value
-            )
+            measure.format_string = self._clean_name(value)
             return True
 
         if key == "isHidden":
@@ -459,8 +410,8 @@ class SemanticModelDefinitionParser:
                 self._parse_field_reference(value)
             )
         elif key == "toColumn":
-            relationship.to_table, relationship.to_column = (
-                self._parse_field_reference(value)
+            relationship.to_table, relationship.to_column = self._parse_field_reference(
+                value
             )
         elif key == "isActive":
             relationship.is_active = self._to_bool(value)

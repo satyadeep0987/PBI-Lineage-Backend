@@ -171,10 +171,7 @@ async def test_snapshot_deduplicates_provider_calls_and_builds_all_datasets():
     source_row = snapshot.source_database_lineage.rows[0]
     assert source_row.semantic_table == "Sales"
     assert source_row.source_provider == "snowflake"
-    assert (
-        source_row.source_fully_qualified_name
-        == "ANALYTICS.MART.FACT_SALES"
-    )
+    assert source_row.source_fully_qualified_name == "ANALYTICS.MART.FACT_SALES"
 
     margin_rows = [
         row
@@ -332,7 +329,7 @@ def _semantic_model(
                     ParsedSemanticModelColumn(
                         name="Band",
                         data_type="string",
-                        expression="IF('Sales'[Amount] > 100, \"High\", \"Low\")",
+                        expression='IF(\'Sales\'[Amount] > 100, "High", "Low")',
                     ),
                 ],
                 measures=[
@@ -350,7 +347,7 @@ def _semantic_model(
                         name="Sales",
                         source_type="m",
                         expression=(
-                            'Snowflake.Databases('
+                            "Snowflake.Databases("
                             '"acme.snowflakecomputing.com", "ANALYTICS", '
                             '[Warehouse="WH"]){[Schema="MART",'
                             'Item="FACT_SALES"]}[Data]'

@@ -40,7 +40,6 @@ class VisualFieldReference(BaseModel):
     aggregation_function: int | str | None = None
 
 
-
 class SemanticModelReference(BaseModel):
     mode: Literal[
         "by_connection",
@@ -77,13 +76,10 @@ class NormalizedReportVisual(BaseModel):
 
     has_query: bool = False
 
-    position: (
-        NormalizedVisualPosition | None
-    ) = None
+    position: NormalizedVisualPosition | None = None
 
-    field_references: list[VisualFieldReference] = Field(
-        default_factory=list
-    )
+    field_references: list[VisualFieldReference] = Field(default_factory=list)
+
 
 class NormalizedReportPage(BaseModel):
     name: str
@@ -97,16 +93,12 @@ class NormalizedReportPage(BaseModel):
     width: float | None = None
     height: float | None = None
 
-    visuals: list[
-        NormalizedReportVisual
-    ]
+    visuals: list[NormalizedReportVisual]
 
     visual_count: int
 
 
-class NormalizedReportDefinitionResponse(
-    BaseModel
-):
+class NormalizedReportDefinitionResponse(BaseModel):
     workspace_id: str
     report_id: str
 
@@ -118,13 +110,9 @@ class NormalizedReportDefinitionResponse(
 
     definition_version: str | None = None
 
-    semantic_model: (
-        SemanticModelReference | None
-    ) = None
+    semantic_model: SemanticModelReference | None = None
 
-    pages: list[
-        NormalizedReportPage
-    ]
+    pages: list[NormalizedReportPage]
 
     page_count: int
     visual_count: int
@@ -133,4 +121,3 @@ class NormalizedReportDefinitionResponse(
     decoded_json_part_count: int
 
     warnings: list[str]
-

@@ -8,20 +8,13 @@ from app.core.request_context import (
     set_request_id,
 )
 
-_REQUEST_ID_PATTERN = re.compile(
-    r"^[A-Za-z0-9._-]{1,128}$"
-)
+_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 
 def _create_request_id(
     supplied_request_id: str | None,
 ) -> str:
-    if (
-        supplied_request_id
-        and _REQUEST_ID_PATTERN.fullmatch(
-            supplied_request_id
-        )
-    ):
+    if supplied_request_id and _REQUEST_ID_PATTERN.fullmatch(supplied_request_id):
         return supplied_request_id
 
     return str(uuid4())
@@ -45,13 +38,9 @@ class RequestIDMiddleware:
             )
             return
 
-        request_headers = dict(
-            scope.get("headers", [])
-        )
+        request_headers = dict(scope.get("headers", []))
 
-        raw_request_id = request_headers.get(
-            b"x-request-id"
-        )
+        raw_request_id = request_headers.get(b"x-request-id")
 
         supplied_request_id: str | None = None
 
@@ -61,20 +50,13 @@ class RequestIDMiddleware:
                 errors="ignore",
             ).strip()
 
-        request_id = _create_request_id(
-            supplied_request_id
-        )
+        request_id = _create_request_id(supplied_request_id)
 
-        scope.setdefault(
-            "state",
-            {}
-        )
+        scope.setdefault("state", {})
 
         scope["state"]["request_id"] = request_id
 
-        context_token = set_request_id(
-            request_id
-        )
+        context_token = set_request_id(request_id)
 
         async def send_with_request_id(
             message: Message,
@@ -105,6 +87,4 @@ class RequestIDMiddleware:
                 send_with_request_id,
             )
         finally:
-            reset_request_id(
-                context_token
-            )
+            reset_request_id(context_token)

@@ -88,9 +88,7 @@ def test_get_scanner_scan_status(client, monkeypatch):
 
     monkeypatch.setattr(ScannerService, "get_scan_status", fake_status)
 
-    response = client.get(
-        f"/api/v1/scanner/scans/{SCAN_ID}/status"
-    )
+    response = client.get(f"/api/v1/scanner/scans/{SCAN_ID}/status")
 
     assert response.status_code == 200
     assert response.json()["status"] == "Succeeded"
@@ -111,12 +109,8 @@ def test_get_scanner_result_returns_summary_and_raw_payload(
 
     monkeypatch.setattr(ScannerService, "get_scan_result", fake_result)
 
-    response = client.get(
-        f"/api/v1/scanner/scans/{SCAN_ID}/result"
-    )
+    response = client.get(f"/api/v1/scanner/scans/{SCAN_ID}/result")
 
     assert response.status_code == 200
     assert response.json()["summary"]["workspace_count"] == 1
-    assert response.json()["payload"]["workspaces"][0]["id"] == (
-        WORKSPACE_ID
-    )
+    assert response.json()["payload"]["workspaces"][0]["id"] == (WORKSPACE_ID)

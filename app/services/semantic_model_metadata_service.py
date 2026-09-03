@@ -72,21 +72,11 @@ class SemanticModelMetadataService:
     def __init__(
         self,
         *,
-        definition_service: (
-            SemanticModelDefinitionService | None
-        ) = None,
-        xmla_metadata_service: (
-            XmlaMetadataService | None
-        ) = None,
+        definition_service: (SemanticModelDefinitionService | None) = None,
+        xmla_metadata_service: (XmlaMetadataService | None) = None,
     ) -> None:
-        self.definition_service = (
-            definition_service
-            or SemanticModelDefinitionService()
-        )
-        self.xmla_metadata_service = (
-            xmla_metadata_service
-            or XmlaMetadataService()
-        )
+        self.definition_service = definition_service or SemanticModelDefinitionService()
+        self.xmla_metadata_service = xmla_metadata_service or XmlaMetadataService()
 
     async def get_metadata(
         self,
@@ -142,10 +132,7 @@ class SemanticModelMetadataService:
     def _validate_source_identity(
         self,
         *,
-        source: (
-            ParsedSemanticModelResponse
-            | XmlaSemanticModelMetadataResponse
-        ),
+        source: (ParsedSemanticModelResponse | XmlaSemanticModelMetadataResponse),
         workspace_id: str,
         semantic_model_id: str,
         provider: str,
@@ -195,10 +182,7 @@ class SemanticModelMetadataService:
                 xmla_table=xmla_table,
             )
 
-        definition_table_keys = {
-            self._key(table.name)
-            for table in definition.tables
-        }
+        definition_table_keys = {self._key(table.name) for table in definition.tables}
         for xmla_table in xmla.tables:
             if self._key(xmla_table.name) not in definition_table_keys:
                 self._append_table_object_matches(
@@ -223,18 +207,11 @@ class SemanticModelMetadataService:
             ],
         )
 
-        matched_count = sum(
-            match.status == "matched"
-            for match in matches
-        )
+        matched_count = sum(match.status == "matched" for match in matches)
         definition_only_count = sum(
-            match.status == "definition_only"
-            for match in matches
+            match.status == "definition_only" for match in matches
         )
-        xmla_only_count = sum(
-            match.status == "xmla_only"
-            for match in matches
-        )
+        xmla_only_count = sum(match.status == "xmla_only" for match in matches)
 
         return SemanticModelMetadataReconciliation(
             matched_count=matched_count,
@@ -251,45 +228,21 @@ class SemanticModelMetadataService:
         xmla_table: XmlaSemanticModelTable | None,
     ) -> None:
         table_name = (
-            definition_table.name
-            if definition_table is not None
-            else xmla_table.name
+            definition_table.name if definition_table is not None else xmla_table.name
         )
         definition_columns = (
-            definition_table.columns
-            if definition_table is not None
-            else []
+            definition_table.columns if definition_table is not None else []
         )
-        xmla_columns = (
-            xmla_table.columns
-            if xmla_table is not None
-            else []
-        )
+        xmla_columns = xmla_table.columns if xmla_table is not None else []
         definition_measures = (
-            definition_table.measures
-            if definition_table is not None
-            else []
+            definition_table.measures if definition_table is not None else []
         )
-        xmla_measures = (
-            xmla_table.measures
-            if xmla_table is not None
-            else []
-        )
+        xmla_measures = xmla_table.measures if xmla_table is not None else []
         definition_hierarchies = (
-            definition_table.hierarchies
-            if definition_table is not None
-            else []
+            definition_table.hierarchies if definition_table is not None else []
         )
-        xmla_hierarchies = (
-            xmla_table.hierarchies
-            if xmla_table is not None
-            else []
-        )
-        xmla_partitions = (
-            xmla_table.partitions
-            if xmla_table is not None
-            else []
-        )
+        xmla_hierarchies = xmla_table.hierarchies if xmla_table is not None else []
+        xmla_partitions = xmla_table.partitions if xmla_table is not None else []
 
         self._append_named_matches(
             matches=matches,
@@ -376,19 +329,15 @@ class SemanticModelMetadataService:
         )
 
         definition_by_key = {
-            self._key(hierarchy.name): hierarchy
-            for hierarchy in definition_hierarchies
+            self._key(hierarchy.name): hierarchy for hierarchy in definition_hierarchies
         }
         xmla_by_key = {
-            self._key(hierarchy.name): hierarchy
-            for hierarchy in xmla_hierarchies
+            self._key(hierarchy.name): hierarchy for hierarchy in xmla_hierarchies
         }
 
         hierarchy_keys = list(definition_by_key)
         hierarchy_keys.extend(
-            key
-            for key in xmla_by_key
-            if key not in definition_by_key
+            key for key in xmla_by_key if key not in definition_by_key
         )
 
         for key in hierarchy_keys:
@@ -409,13 +358,9 @@ class SemanticModelMetadataService:
                     else []
                 ),
                 xmla_objects=(
-                    xmla_hierarchy.levels
-                    if xmla_hierarchy is not None
-                    else []
+                    xmla_hierarchy.levels if xmla_hierarchy is not None else []
                 ),
-                key_scope=(
-                    f"{table_name}\u001f{hierarchy_name}"
-                ),
+                key_scope=(f"{table_name}\u001f{hierarchy_name}"),
             )
 
     def _append_matches(
@@ -437,24 +382,16 @@ class SemanticModelMetadataService:
             xmla_matches = xmla_by_key.get(
                 definition_candidate.key,
             )
-            xmla_candidate = (
-                xmla_matches.pop(0)
-                if xmla_matches
-                else None
-            )
+            xmla_candidate = xmla_matches.pop(0) if xmla_matches else None
             matches.append(
                 SemanticModelMetadataMatch(
                     object_type=object_type,
                     object_name=definition_candidate.object_name,
                     table_name=definition_candidate.table_name,
                     status=(
-                        "matched"
-                        if xmla_candidate is not None
-                        else "definition_only"
+                        "matched" if xmla_candidate is not None else "definition_only"
                     ),
-                    definition_source_path=(
-                        definition_candidate.source_path
-                    ),
+                    definition_source_path=(definition_candidate.source_path),
                     xmla_object_name=(
                         xmla_candidate.object_name
                         if xmla_candidate is not None
@@ -471,9 +408,7 @@ class SemanticModelMetadataService:
                         object_name=xmla_candidate.object_name,
                         table_name=xmla_candidate.table_name,
                         status="xmla_only",
-                        xmla_object_name=(
-                            xmla_candidate.object_name
-                        ),
+                        xmla_object_name=(xmla_candidate.object_name),
                     )
                 )
 
@@ -486,44 +421,27 @@ class SemanticModelMetadataService:
         target_key = self._key(name)
 
         return next(
-            (
-                table
-                for table in tables
-                if self._key(table.name) == target_key
-            ),
+            (table for table in tables if self._key(table.name) == target_key),
             None,
         )
 
     def _relationship_candidate(
         self,
-        relationship: (
-            ParsedSemanticModelRelationship
-            | XmlaSemanticModelRelationship
-        ),
+        relationship: (ParsedSemanticModelRelationship | XmlaSemanticModelRelationship),
         *,
         source_path: str | None = None,
     ) -> _MetadataCandidate:
-        object_name = (
-            relationship.name
-            or self._relationship_identity(
-                relationship
-            )
-        )
+        object_name = relationship.name or self._relationship_identity(relationship)
 
         return _MetadataCandidate(
             object_name=object_name,
-            key=self._relationship_identity(
-                relationship
-            ),
+            key=self._relationship_identity(relationship),
             source_path=source_path,
         )
 
     def _relationship_identity(
         self,
-        relationship: (
-            ParsedSemanticModelRelationship
-            | XmlaSemanticModelRelationship
-        ),
+        relationship: (ParsedSemanticModelRelationship | XmlaSemanticModelRelationship),
     ) -> str:
         fields = (
             relationship.from_table,
@@ -533,16 +451,10 @@ class SemanticModelMetadataService:
         )
 
         if any(fields):
-            return self._key(*[
-                value or ""
-                for value in fields
-            ])
+            return self._key(*[value or "" for value in fields])
 
         return self._key(relationship.name or "")
 
     @staticmethod
     def _key(*parts: str) -> str:
-        return "\u001f".join(
-            part.strip().casefold()
-            for part in parts
-        )
+        return "\u001f".join(part.strip().casefold() for part in parts)

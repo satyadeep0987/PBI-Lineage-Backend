@@ -23,9 +23,7 @@ class SnowflakeSessionAuthService:
     ) -> None:
         self.settings = settings or get_settings()
         self.client = client or SnowflakeSessionClient(
-            allow_external_browser=(
-                self.settings.snowflake_allow_external_browser_auth
-            )
+            allow_external_browser=(self.settings.snowflake_allow_external_browser_auth)
         )
         self.store = store or get_snowflake_session_store(
             self.settings.snowflake_session_max_age_seconds

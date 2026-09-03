@@ -32,21 +32,17 @@ VISUAL_PATTERN = re.compile(
     r"([^/]+)/visual\.json$"
 )
 
-SEMANTIC_MODEL_ID_PATTERN = (
-    re.compile(
-        r"(?:^|;)\s*"
-        r"semanticmodelid\s*="
-        r"\s*([^;]+)",
-        re.IGNORECASE,
-    )
+SEMANTIC_MODEL_ID_PATTERN = re.compile(
+    r"(?:^|;)\s*"
+    r"semanticmodelid\s*="
+    r"\s*([^;]+)",
+    re.IGNORECASE,
 )
 
 
 class ReportDefinitionNormalizer:
     def __init__(self) -> None:
-        self.decoder = (
-            ReportDefinitionDecoder()
-        )
+        self.decoder = ReportDefinitionDecoder()
 
     @staticmethod
     def _detect_format(
@@ -54,27 +50,13 @@ class ReportDefinitionNormalizer:
         raw: ReportDefinitionResponse,
         decoded: dict[str, Any],
     ) -> str:
-        reported_format = (
-            raw.definition.format
-        )
+        reported_format = raw.definition.format
 
-        has_pbir = any(
-            path.startswith(
-                "definition/"
-            )
-            for path in decoded
-        )
+        has_pbir = any(path.startswith("definition/") for path in decoded)
 
-        has_legacy = (
-            "report.json"
-            in decoded
-        )
+        has_legacy = "report.json" in decoded
 
-        if (
-            reported_format
-            == "PBIR"
-            or has_pbir
-        ):
+        if reported_format == "PBIR" or has_pbir:
             return "PBIR"
 
         if (
@@ -93,19 +75,13 @@ class ReportDefinitionNormalizer:
     def _get_definition_properties(
         decoded: dict[str, Any],
     ) -> dict[str, Any]:
-        definition = decoded.get(
-            "definition.pbir"
-        )
+        definition = decoded.get("definition.pbir")
 
         if not isinstance(
             definition,
             dict,
         ):
-            raise (
-                UpstreamInvalidResponseError(
-                    "fabric"
-                )
-            )
+            raise (UpstreamInvalidResponseError("fabric"))
 
         return definition
 
@@ -113,11 +89,7 @@ class ReportDefinitionNormalizer:
     def _extract_semantic_model(
         definition: dict[str, Any],
     ) -> SemanticModelReference | None:
-        dataset_reference = (
-            definition.get(
-                "datasetReference"
-            )
-        )
+        dataset_reference = definition.get("datasetReference")
 
         if not isinstance(
             dataset_reference,
@@ -125,17 +97,13 @@ class ReportDefinitionNormalizer:
         ):
             return None
 
-        by_path = dataset_reference.get(
-            "byPath"
-        )
+        by_path = dataset_reference.get("byPath")
 
         if isinstance(
             by_path,
             dict,
         ):
-            path = by_path.get(
-                "path"
-            )
+            path = by_path.get("path")
 
             if isinstance(
                 path,
@@ -146,39 +114,24 @@ class ReportDefinitionNormalizer:
                     path=path,
                 )
 
-        by_connection = (
-            dataset_reference.get(
-                "byConnection"
-            )
-        )
+        by_connection = dataset_reference.get("byConnection")
 
         if isinstance(
             by_connection,
             dict,
         ):
-            connection_string = (
-                by_connection.get(
-                    "connectionString"
-                )
-            )
+            connection_string = by_connection.get("connectionString")
 
-            semantic_model_id = (
-                ReportDefinitionNormalizer
-                ._extract_semantic_model_id(
-                    connection_string
-                )
+            semantic_model_id = ReportDefinitionNormalizer._extract_semantic_model_id(
+                connection_string
             )
 
             return SemanticModelReference(
                 mode="by_connection",
-                semantic_model_id=(
-                    semantic_model_id
-                ),
+                semantic_model_id=(semantic_model_id),
             )
 
-        return SemanticModelReference(
-            mode="unknown"
-        )
+        return SemanticModelReference(mode="unknown")
 
     @staticmethod
     def _extract_semantic_model_id(
@@ -190,20 +143,12 @@ class ReportDefinitionNormalizer:
         ):
             return None
 
-        match = (
-            SEMANTIC_MODEL_ID_PATTERN.search(
-                connection_string
-            )
-        )
+        match = SEMANTIC_MODEL_ID_PATTERN.search(connection_string)
 
         if match is None:
             return None
 
-        value = (
-            match.group(1)
-            .strip()
-            .strip("[]")
-        )
+        value = match.group(1).strip().strip("[]")
 
         return value or None
 
@@ -213,20 +158,12 @@ class ReportDefinitionNormalizer:
         decoded: dict[str, Any],
         warnings: list[str],
     ) -> list[NormalizedReportPage]:
-        page_order, active_page = (
-            self._get_pages_metadata(
-                decoded
-            )
-        )
+        page_order, active_page = self._get_pages_metadata(decoded)
 
-        pages: list[
-            NormalizedReportPage
-        ] = []
+        pages: list[NormalizedReportPage] = []
 
         for path, payload in decoded.items():
-            match = PAGE_PATTERN.match(
-                path
-            )
+            match = PAGE_PATTERN.match(path)
 
             if match is None:
                 continue
@@ -237,11 +174,7 @@ class ReportDefinitionNormalizer:
                 payload,
                 dict,
             ):
-                raise (
-                    UpstreamInvalidResponseError(
-                        "fabric"
-                    )
-                )
+                raise (UpstreamInvalidResponseError("fabric"))
 
             page = self._normalize_page(
                 page_folder=page_folder,
@@ -252,13 +185,9 @@ class ReportDefinitionNormalizer:
                 warnings=warnings,
             )
 
-            pages.append(
-                page
-            )
+            pages.append(page)
 
-        pages.sort(
-            key=self._page_sort_key
-        )
+        pages.sort(key=self._page_sort_key)
 
         return pages
 
@@ -269,9 +198,7 @@ class ReportDefinitionNormalizer:
         list[str],
         str | None,
     ]:
-        metadata = decoded.get(
-            "definition/pages/pages.json"
-        )
+        metadata = decoded.get("definition/pages/pages.json")
 
         if not isinstance(
             metadata,
@@ -279,9 +206,7 @@ class ReportDefinitionNormalizer:
         ):
             return [], None
 
-        raw_order = metadata.get(
-            "pageOrder"
-        )
+        raw_order = metadata.get("pageOrder")
 
         page_order = []
 
@@ -298,9 +223,7 @@ class ReportDefinitionNormalizer:
                 )
             ]
 
-        active_page = metadata.get(
-            "activePageName"
-        )
+        active_page = metadata.get("activePageName")
 
         if not isinstance(
             active_page,
@@ -328,23 +251,14 @@ class ReportDefinitionNormalizer:
             "name",
         )
 
-        page_name = (
-            payload_name
-            or page_folder
-        )
+        page_name = payload_name or page_folder
 
-        if (
-            payload_name
-            and payload_name
-            != page_folder
-        ):
+        if payload_name and payload_name != page_folder:
             warnings.append(
-                
-                    "Page folder identifier "
-                    f"'{page_folder}' differs "
-                    f"from page name "
-                    f"'{payload_name}'."
-                
+                "Page folder identifier "
+                f"'{page_folder}' differs "
+                f"from page name "
+                f"'{payload_name}'."
             )
 
         display_name = (
@@ -358,25 +272,18 @@ class ReportDefinitionNormalizer:
         order = None
 
         if page_name in page_order:
-            order = page_order.index(
-                page_name
-            )
+            order = page_order.index(page_name)
 
-        visuals = (
-            self._normalize_visuals(
-                page_folder=page_folder,
-                decoded=decoded,
-            )
+        visuals = self._normalize_visuals(
+            page_folder=page_folder,
+            decoded=decoded,
         )
 
         return NormalizedReportPage(
             name=page_name,
             display_name=display_name,
             order=order,
-            is_active=(
-                page_name
-                == active_page
-            ),
+            is_active=(page_name == active_page),
             display_option=(
                 self._get_string(
                     payload,
@@ -392,9 +299,7 @@ class ReportDefinitionNormalizer:
                 "height",
             ),
             visuals=visuals,
-            visual_count=len(
-                visuals
-            ),
+            visual_count=len(visuals),
         )
 
     def _normalize_visuals(
@@ -403,52 +308,35 @@ class ReportDefinitionNormalizer:
         page_folder: str,
         decoded: dict[str, Any],
     ) -> list[NormalizedReportVisual]:
-        visuals: list[
-            NormalizedReportVisual
-        ] = []
+        visuals: list[NormalizedReportVisual] = []
 
         for path, payload in decoded.items():
-            match = VISUAL_PATTERN.match(
-                path
-            )
+            match = VISUAL_PATTERN.match(path)
 
             if match is None:
                 continue
 
             matched_page = match.group(1)
 
-            if (
-                matched_page
-                != page_folder
-            ):
+            if matched_page != page_folder:
                 continue
 
-            visual_folder = (
-                match.group(2)
-            )
+            visual_folder = match.group(2)
 
             if not isinstance(
                 payload,
                 dict,
             ):
-                raise (
-                    UpstreamInvalidResponseError(
-                        "fabric"
-                    )
-                )
+                raise (UpstreamInvalidResponseError("fabric"))
 
             visuals.append(
                 self._normalize_visual(
-                    visual_folder=(
-                        visual_folder
-                    ),
+                    visual_folder=(visual_folder),
                     payload=payload,
                 )
             )
 
-        visuals.sort(
-            key=self._visual_sort_key
-        )
+        visuals.sort(key=self._visual_sort_key)
 
         return visuals
 
@@ -466,9 +354,7 @@ class ReportDefinitionNormalizer:
             or visual_folder
         )
 
-        visual_config = payload.get(
-            "visual"
-        )
+        visual_config = payload.get("visual")
 
         visual_type = None
         has_query = False
@@ -486,20 +372,13 @@ class ReportDefinitionNormalizer:
                 "visualType",
             )
 
-            has_query = (
-                visual_config.get(
-                    "query"
-                )
-                is not None
-            )
+            has_query = visual_config.get("query") is not None
 
             (
                 title,
                 title_visible,
                 title_is_dynamic,
-            ) = self._extract_visual_title(
-                visual_config
-            )
+            ) = self._extract_visual_title(visual_config)
 
         is_hidden = payload.get(
             "isHidden",
@@ -517,9 +396,7 @@ class ReportDefinitionNormalizer:
             internal_name=internal_name,
             title=title,
             title_visible=title_visible,
-            title_is_dynamic=(
-                title_is_dynamic
-            ),
+            title_is_dynamic=(title_is_dynamic),
             visual_type=visual_type,
             parent_group_name=(
                 self._get_string(
@@ -529,20 +406,10 @@ class ReportDefinitionNormalizer:
             ),
             is_hidden=is_hidden,
             has_query=has_query,
-            position=(
-                self._normalize_position(
-                    payload.get(
-                        "position"
-                    )
-                )
-            ),
-            field_references=(
-                extract_visual_field_references(
-                    payload
-                )
-            ),
+            position=(self._normalize_position(payload.get("position"))),
+            field_references=(extract_visual_field_references(payload)),
         )
-    
+
     def _normalize_position(
         self,
         value: Any,
@@ -589,11 +456,7 @@ class ReportDefinitionNormalizer:
         bool | None,
         bool,
     ]:
-        container_objects = (
-            visual_config.get(
-                "visualContainerObjects"
-            )
-        )
+        container_objects = visual_config.get("visualContainerObjects")
 
         if not isinstance(
             container_objects,
@@ -601,11 +464,7 @@ class ReportDefinitionNormalizer:
         ):
             return None, None, False
 
-        title_objects = (
-            container_objects.get(
-                "title"
-            )
-        )
+        title_objects = container_objects.get("title")
 
         if not isinstance(
             title_objects,
@@ -623,11 +482,7 @@ class ReportDefinitionNormalizer:
             ):
                 continue
 
-            properties = (
-                title_object.get(
-                    "properties"
-                )
-            )
+            properties = title_object.get("properties")
 
             if not isinstance(
                 properties,
@@ -636,13 +491,7 @@ class ReportDefinitionNormalizer:
                 continue
 
             if "show" in properties:
-                visible = (
-                    cls._extract_literal_bool(
-                        properties.get(
-                            "show"
-                        )
-                    )
-                )
+                visible = cls._extract_literal_bool(properties.get("show"))
 
                 if visible is not None:
                     title_visible = visible
@@ -650,13 +499,7 @@ class ReportDefinitionNormalizer:
             if "text" not in properties:
                 continue
 
-            title = (
-                cls._extract_literal_string(
-                    properties.get(
-                        "text"
-                    )
-                )
-            )
+            title = cls._extract_literal_string(properties.get("text"))
 
             if title is not None:
                 return (
@@ -687,9 +530,7 @@ class ReportDefinitionNormalizer:
         ):
             return None
 
-        expression = value.get(
-            "expr"
-        )
+        expression = value.get("expr")
 
         if not isinstance(
             expression,
@@ -697,9 +538,7 @@ class ReportDefinitionNormalizer:
         ):
             return None
 
-        literal = expression.get(
-            "Literal"
-        )
+        literal = expression.get("Literal")
 
         if not isinstance(
             literal,
@@ -707,9 +546,7 @@ class ReportDefinitionNormalizer:
         ):
             return None
 
-        raw_value = literal.get(
-            "Value"
-        )
+        raw_value = literal.get("Value")
 
         if not isinstance(
             raw_value,
@@ -724,12 +561,9 @@ class ReportDefinitionNormalizer:
             and raw_value.startswith("'")
             and raw_value.endswith("'")
         ):
-            return (
-                raw_value[1:-1]
-                .replace(
-                    "''",
-                    "'",
-                )
+            return raw_value[1:-1].replace(
+                "''",
+                "'",
             )
 
         return raw_value or None
@@ -744,9 +578,7 @@ class ReportDefinitionNormalizer:
         ):
             return None
 
-        expression = value.get(
-            "expr"
-        )
+        expression = value.get("expr")
 
         if not isinstance(
             expression,
@@ -754,9 +586,7 @@ class ReportDefinitionNormalizer:
         ):
             return None
 
-        literal = expression.get(
-            "Literal"
-        )
+        literal = expression.get("Literal")
 
         if not isinstance(
             literal,
@@ -764,9 +594,7 @@ class ReportDefinitionNormalizer:
         ):
             return None
 
-        raw_value = literal.get(
-            "Value"
-        )
+        raw_value = literal.get("Value")
 
         if not isinstance(
             raw_value,
@@ -774,9 +602,7 @@ class ReportDefinitionNormalizer:
         ):
             return None
 
-        normalized = (
-            raw_value.strip().lower()
-        )
+        normalized = raw_value.strip().lower()
 
         if normalized == "true":
             return True
@@ -791,14 +617,9 @@ class ReportDefinitionNormalizer:
         value: dict[str, Any],
         key: str,
     ) -> str | None:
-        result = value.get(
-            key
-        )
+        result = value.get(key)
 
-        if (
-            isinstance(result, str)
-            and result
-        ):
+        if isinstance(result, str) and result:
             return result
 
         return None
@@ -808,9 +629,7 @@ class ReportDefinitionNormalizer:
         value: dict[str, Any],
         key: str,
     ) -> float | None:
-        result = value.get(
-            key
-        )
+        result = value.get(key)
 
         if isinstance(
             result,
@@ -822,9 +641,7 @@ class ReportDefinitionNormalizer:
             result,
             (int, float),
         ):
-            return float(
-                result
-            )
+            return float(result)
 
         return None
 
@@ -853,11 +670,7 @@ class ReportDefinitionNormalizer:
         float,
         str,
     ]:
-        if (
-            visual.position is None
-            or visual.position.tab_order
-            is None
-        ):
+        if visual.position is None or visual.position.tab_order is None:
             return (
                 1,
                 0,
@@ -874,9 +687,7 @@ class ReportDefinitionNormalizer:
         self,
         raw: ReportDefinitionResponse,
     ) -> NormalizedReportDefinitionResponse:
-        decoded = self.decoder.decode(
-            raw.definition
-        )
+        decoded = self.decoder.decode(raw.definition)
 
         warnings: list[str] = []
 
@@ -885,24 +696,14 @@ class ReportDefinitionNormalizer:
             decoded=decoded,
         )
 
-        definition_properties = (
-            self._get_definition_properties(
-                decoded
-            )
+        definition_properties = self._get_definition_properties(decoded)
+
+        definition_version = self._get_string(
+            definition_properties,
+            "version",
         )
 
-        definition_version = (
-            self._get_string(
-                definition_properties,
-                "version",
-            )
-        )
-
-        semantic_model = (
-            self._extract_semantic_model(
-                definition_properties
-            )
-        )
+        semantic_model = self._extract_semantic_model(definition_properties)
 
         if format_name == "PBIR":
             pages = self._normalize_pbir_pages(
@@ -914,46 +715,28 @@ class ReportDefinitionNormalizer:
             pages = []
 
             warnings.append(
-                
-                    "PBIR-Legacy report.json "
-                    "was decoded but deep visual "
-                    "normalization is not performed."
-                
+                "PBIR-Legacy report.json "
+                "was decoded but deep visual "
+                "normalization is not performed."
             )
 
         else:
             pages = []
 
-            warnings.append(
-                
-                    "Report definition format "
-                    "could not be identified."
-                
-            )
+            warnings.append("Report definition format could not be identified.")
 
-        visual_count = sum(
-            page.visual_count
-            for page in pages
-        )
+        visual_count = sum(page.visual_count for page in pages)
 
-        return (
-            NormalizedReportDefinitionResponse(
-                workspace_id=raw.workspace_id,
-                report_id=raw.report_id,
-                format=format_name,
-                definition_version=(
-                    definition_version
-                ),
-                semantic_model=semantic_model,
-                pages=pages,
-                page_count=len(pages),
-                visual_count=visual_count,
-                source_part_count=len(
-                    raw.definition.parts
-                ),
-                decoded_json_part_count=len(
-                    decoded
-                ),
-                warnings=warnings,
-            )
+        return NormalizedReportDefinitionResponse(
+            workspace_id=raw.workspace_id,
+            report_id=raw.report_id,
+            format=format_name,
+            definition_version=(definition_version),
+            semantic_model=semantic_model,
+            pages=pages,
+            page_count=len(pages),
+            visual_count=visual_count,
+            source_part_count=len(raw.definition.parts),
+            decoded_json_part_count=len(decoded),
+            warnings=warnings,
         )

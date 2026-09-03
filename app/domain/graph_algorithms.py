@@ -4,10 +4,7 @@ from collections.abc import Iterator
 def strongly_connected_components(
     adjacency: dict[str, set[str]],
 ) -> list[set[str]]:
-    graph = {
-        node: set(neighbors)
-        for node, neighbors in adjacency.items()
-    }
+    graph = {node: set(neighbors) for node, neighbors in adjacency.items()}
     for neighbors in adjacency.values():
         for neighbor in neighbors:
             graph.setdefault(neighbor, set())

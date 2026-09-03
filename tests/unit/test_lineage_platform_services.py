@@ -64,7 +64,9 @@ def test_repository_versions_only_changed_graphs(tmp_path):
 
     first = repository.save_graph(_graph())
     unchanged = repository.save_graph(
-        _graph().model_copy(update={"created_at": datetime.now(UTC) + timedelta(days=1)})
+        _graph().model_copy(
+            update={"created_at": datetime.now(UTC) + timedelta(days=1)}
+        )
     )
     second = repository.save_graph(_graph(label="Revenue"))
 
@@ -157,10 +159,7 @@ def test_validation_rejects_missing_edge_endpoint():
 
 
 def test_cycle_detection_handles_deep_graph_without_recursion():
-    adjacency = {
-        str(index): {str(index + 1)}
-        for index in range(2000)
-    }
+    adjacency = {str(index): {str(index + 1)} for index in range(2000)}
     adjacency["2000"] = {"1000"}
 
     components = strongly_connected_components(adjacency)

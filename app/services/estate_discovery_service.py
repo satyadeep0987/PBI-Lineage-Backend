@@ -78,9 +78,7 @@ class EstateDiscoveryService:
             warnings=warnings,
             workspace_count=len(inventories),
             report_count=sum(len(item.reports) for item in inventories),
-            semantic_model_count=sum(
-                len(item.semantic_models) for item in inventories
-            ),
+            semantic_model_count=sum(len(item.semantic_models) for item in inventories),
         )
 
     async def _reports(

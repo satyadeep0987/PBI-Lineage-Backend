@@ -14,9 +14,7 @@ def test_extracts_column_projection():
                                 "field": {
                                     "Column": {
                                         "Expression": {
-                                            "SourceRef": {
-                                                "Entity": "Product"
-                                            }
+                                            "SourceRef": {"Entity": "Product"}
                                         },
                                         "Property": "Brand",
                                     }
@@ -31,9 +29,7 @@ def test_extracts_column_projection():
         }
     }
 
-    result = extract_visual_field_references(
-        visual_definition
-    )
+    result = extract_visual_field_references(visual_definition)
 
     assert len(result) == 1
 
@@ -59,16 +55,12 @@ def test_extracts_measure_projection():
                                 "field": {
                                     "Measure": {
                                         "Expression": {
-                                            "SourceRef": {
-                                                "Entity": "Sales"
-                                            }
+                                            "SourceRef": {"Entity": "Sales"}
                                         },
                                         "Property": "Sales Amount",
                                     }
                                 },
-                                "queryRef": (
-                                    "Measure Table.Sales Amount"
-                                ),
+                                "queryRef": ("Measure Table.Sales Amount"),
                             }
                         ]
                     }
@@ -77,9 +69,7 @@ def test_extracts_measure_projection():
         }
     }
 
-    result = extract_visual_field_references(
-        visual_definition
-    )
+    result = extract_visual_field_references(visual_definition)
 
     assert len(result) == 1
 
@@ -88,10 +78,7 @@ def test_extracts_measure_projection():
     assert reference.object_type == "measure"
     assert reference.table_name == "Sales"
     assert reference.object_name == "Sales Amount"
-    assert (
-        reference.query_ref
-        == "Measure Table.Sales Amount"
-    )
+    assert reference.query_ref == "Measure Table.Sales Amount"
 
 
 def test_non_data_visual_returns_empty_list():
@@ -102,8 +89,6 @@ def test_non_data_visual_returns_empty_list():
         },
     }
 
-    result = extract_visual_field_references(
-        visual_definition
-    )
+    result = extract_visual_field_references(visual_definition)
 
     assert result == []

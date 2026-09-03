@@ -29,9 +29,7 @@ class XmlaMetadataService:
         powerbi_client: PowerBIClient | None = None,
     ) -> None:
         self.client = xmla_client or XmlaClient()
-        self.powerbi_client = (
-            powerbi_client or PowerBIClient()
-        )
+        self.powerbi_client = powerbi_client or PowerBIClient()
 
     async def get_metadata(
         self,
@@ -42,55 +40,36 @@ class XmlaMetadataService:
         workspace_name: str | None = None,
         database_name: str | None = None,
     ) -> XmlaSemanticModelMetadataResponse:
-        resolved_workspace_name = (
-            await self._resolve_workspace_name(
-                workspace_id=workspace_id,
-                workspace_name=workspace_name,
-                access_token=access_token,
-            )
+        resolved_workspace_name = await self._resolve_workspace_name(
+            workspace_id=workspace_id,
+            workspace_name=workspace_name,
+            access_token=access_token,
         )
-        resolved_database_name = (
-            await self._resolve_database_name(
-                workspace_id=workspace_id,
-                semantic_model_id=(
-                    semantic_model_id
-                ),
-                database_name=database_name,
-                access_token=access_token,
-            )
+        resolved_database_name = await self._resolve_database_name(
+            workspace_id=workspace_id,
+            semantic_model_id=(semantic_model_id),
+            database_name=database_name,
+            access_token=access_token,
         )
 
-        raw_metadata = (
-            await self.client
-            .get_semantic_model_metadata(
-                workspace_id=workspace_id,
-                semantic_model_id=semantic_model_id,
-                access_token=access_token,
-                workspace_name=(
-                    resolved_workspace_name
-                ),
-                database_name=(
-                    resolved_database_name
-                ),
-            )
+        raw_metadata = await self.client.get_semantic_model_metadata(
+            workspace_id=workspace_id,
+            semantic_model_id=semantic_model_id,
+            access_token=access_token,
+            workspace_name=(resolved_workspace_name),
+            database_name=(resolved_database_name),
         )
 
-        xmla_endpoint = (
-            self.client.build_workspace_endpoint(
-                workspace_id=workspace_id,
-                workspace_name=(
-                    resolved_workspace_name
-                ),
-            )
+        xmla_endpoint = self.client.build_workspace_endpoint(
+            workspace_id=workspace_id,
+            workspace_name=(resolved_workspace_name),
         )
 
         return self._map_metadata(
             workspace_id=workspace_id,
             semantic_model_id=semantic_model_id,
             xmla_endpoint=xmla_endpoint,
-            requested_database_name=(
-                resolved_database_name
-            ),
+            requested_database_name=(resolved_database_name),
             raw_metadata=raw_metadata,
         )
 
@@ -104,16 +83,11 @@ class XmlaMetadataService:
         if workspace_name:
             return workspace_name
 
-        raw_workspace = (
-            await self.powerbi_client
-            .get_workspace(
-                workspace_id=workspace_id,
-                access_token=access_token,
-            )
+        raw_workspace = await self.powerbi_client.get_workspace(
+            workspace_id=workspace_id,
+            access_token=access_token,
         )
-        resolved_workspace_name = (
-            raw_workspace.get("name")
-        )
+        resolved_workspace_name = raw_workspace.get("name")
 
         if (
             not isinstance(
@@ -122,9 +96,7 @@ class XmlaMetadataService:
             )
             or not resolved_workspace_name
         ):
-            raise UpstreamInvalidResponseError(
-                "powerbi"
-            )
+            raise UpstreamInvalidResponseError("powerbi")
 
         return resolved_workspace_name
 
@@ -139,28 +111,17 @@ class XmlaMetadataService:
         if database_name:
             return database_name
 
-        raw_models = (
-            await self.powerbi_client
-            .get_semantic_models_in_workspace(
-                workspace_id=workspace_id,
-                access_token=access_token,
-            )
+        raw_models = await self.powerbi_client.get_semantic_models_in_workspace(
+            workspace_id=workspace_id,
+            access_token=access_token,
         )
-        target_model_id = (
-            semantic_model_id.lower()
-        )
+        target_model_id = semantic_model_id.lower()
 
         for raw_model in raw_models:
             model_id = raw_model.get("id")
 
-            if (
-                isinstance(model_id, str)
-                and model_id.lower()
-                == target_model_id
-            ):
-                model_name = raw_model.get(
-                    "name"
-                )
+            if isinstance(model_id, str) and model_id.lower() == target_model_id:
+                model_name = raw_model.get("name")
 
                 if (
                     not isinstance(
@@ -169,9 +130,7 @@ class XmlaMetadataService:
                     )
                     or not model_name
                 ):
-                    raise UpstreamInvalidResponseError(
-                        "powerbi"
-                    )
+                    raise UpstreamInvalidResponseError("powerbi")
 
                 return model_name
 
@@ -193,9 +152,7 @@ class XmlaMetadataService:
             raw_metadata,
             dict,
         ):
-            raise UpstreamInvalidResponseError(
-                "xmla"
-            )
+            raise UpstreamInvalidResponseError("xmla")
 
         tables = [
             self._map_table(raw_table)
@@ -206,9 +163,7 @@ class XmlaMetadataService:
         ]
 
         relationships = [
-            self._map_relationship(
-                raw_relationship
-            )
+            self._map_relationship(raw_relationship)
             for raw_relationship in _optional_list(
                 raw_metadata,
                 "relationships",
@@ -216,9 +171,7 @@ class XmlaMetadataService:
         ]
 
         warnings = [
-            self._map_warning(
-                raw_warning
-            )
+            self._map_warning(raw_warning)
             for raw_warning in _optional_list(
                 raw_metadata,
                 "warnings",
@@ -238,25 +191,11 @@ class XmlaMetadataService:
                 or requested_database_name
             ),
             table_count=len(tables),
-            column_count=sum(
-                len(table.columns)
-                for table in tables
-            ),
-            measure_count=sum(
-                len(table.measures)
-                for table in tables
-            ),
-            relationship_count=len(
-                relationships
-            ),
-            hierarchy_count=sum(
-                len(table.hierarchies)
-                for table in tables
-            ),
-            partition_count=sum(
-                len(table.partitions)
-                for table in tables
-            ),
+            column_count=sum(len(table.columns) for table in tables),
+            measure_count=sum(len(table.measures) for table in tables),
+            relationship_count=len(relationships),
+            hierarchy_count=sum(len(table.hierarchies) for table in tables),
+            partition_count=sum(len(table.partitions) for table in tables),
             tables=tables,
             relationships=relationships,
             warnings=warnings,
@@ -266,9 +205,7 @@ class XmlaMetadataService:
         self,
         raw_table: Any,
     ) -> XmlaSemanticModelTable:
-        table = _required_dict(
-            raw_table
-        )
+        table = _required_dict(raw_table)
 
         return XmlaSemanticModelTable(
             name=_required_string(
@@ -285,36 +222,28 @@ class XmlaMetadataService:
                 "isHidden",
             ),
             columns=[
-                self._map_column(
-                    raw_column
-                )
+                self._map_column(raw_column)
                 for raw_column in _optional_list(
                     table,
                     "columns",
                 )
             ],
             measures=[
-                self._map_measure(
-                    raw_measure
-                )
+                self._map_measure(raw_measure)
                 for raw_measure in _optional_list(
                     table,
                     "measures",
                 )
             ],
             partitions=[
-                self._map_partition(
-                    raw_partition
-                )
+                self._map_partition(raw_partition)
                 for raw_partition in _optional_list(
                     table,
                     "partitions",
                 )
             ],
             hierarchies=[
-                self._map_hierarchy(
-                    raw_hierarchy
-                )
+                self._map_hierarchy(raw_hierarchy)
                 for raw_hierarchy in _optional_list(
                     table,
                     "hierarchies",
@@ -326,9 +255,7 @@ class XmlaMetadataService:
         self,
         raw_column: Any,
     ) -> XmlaSemanticModelColumn:
-        column = _required_dict(
-            raw_column
-        )
+        column = _required_dict(raw_column)
 
         return XmlaSemanticModelColumn(
             name=_required_string(
@@ -384,9 +311,7 @@ class XmlaMetadataService:
         self,
         raw_measure: Any,
     ) -> XmlaSemanticModelMeasure:
-        measure = _required_dict(
-            raw_measure
-        )
+        measure = _required_dict(raw_measure)
 
         return XmlaSemanticModelMeasure(
             name=_required_string(
@@ -422,9 +347,7 @@ class XmlaMetadataService:
         self,
         raw_partition: Any,
     ) -> XmlaSemanticModelPartition:
-        partition = _required_dict(
-            raw_partition
-        )
+        partition = _required_dict(raw_partition)
 
         return XmlaSemanticModelPartition(
             name=_required_string(
@@ -455,9 +378,7 @@ class XmlaMetadataService:
         self,
         raw_hierarchy: Any,
     ) -> XmlaSemanticModelHierarchy:
-        hierarchy = _required_dict(
-            raw_hierarchy
-        )
+        hierarchy = _required_dict(raw_hierarchy)
 
         return XmlaSemanticModelHierarchy(
             name=_required_string(
@@ -470,9 +391,7 @@ class XmlaMetadataService:
                 "isHidden",
             ),
             levels=[
-                self._map_hierarchy_level(
-                    raw_level
-                )
+                self._map_hierarchy_level(raw_level)
                 for raw_level in _optional_list(
                     hierarchy,
                     "levels",
@@ -484,9 +403,7 @@ class XmlaMetadataService:
         self,
         raw_level: Any,
     ) -> XmlaSemanticModelHierarchyLevel:
-        level = _required_dict(
-            raw_level
-        )
+        level = _required_dict(raw_level)
 
         return XmlaSemanticModelHierarchyLevel(
             name=_required_string(
@@ -507,9 +424,7 @@ class XmlaMetadataService:
         self,
         raw_relationship: Any,
     ) -> XmlaSemanticModelRelationship:
-        relationship = _required_dict(
-            raw_relationship
-        )
+        relationship = _required_dict(raw_relationship)
 
         return XmlaSemanticModelRelationship(
             name=_optional_string(
@@ -561,9 +476,7 @@ class XmlaMetadataService:
         self,
         raw_warning: Any,
     ) -> XmlaMetadataWarning:
-        warning = _required_dict(
-            raw_warning
-        )
+        warning = _required_dict(raw_warning)
 
         return XmlaMetadataWarning(
             code=_required_string(
@@ -600,9 +513,7 @@ def _required_dict(
         value,
         dict,
     ):
-        raise UpstreamInvalidResponseError(
-            "xmla"
-        )
+        raise UpstreamInvalidResponseError("xmla")
 
     return value
 
@@ -620,9 +531,7 @@ def _required_list(
         value,
         list,
     ):
-        raise UpstreamInvalidResponseError(
-            "xmla"
-        )
+        raise UpstreamInvalidResponseError("xmla")
 
     return value
 
@@ -643,9 +552,7 @@ def _optional_list(
         value,
         list,
     ):
-        raise UpstreamInvalidResponseError(
-            "xmla"
-        )
+        raise UpstreamInvalidResponseError("xmla")
 
     return value
 
@@ -666,9 +573,7 @@ def _required_string(
         )
         or not value
     ):
-        raise UpstreamInvalidResponseError(
-            "xmla"
-        )
+        raise UpstreamInvalidResponseError("xmla")
 
     return value
 
@@ -689,9 +594,7 @@ def _optional_string(
         value,
         str,
     ):
-        raise UpstreamInvalidResponseError(
-            "xmla"
-        )
+        raise UpstreamInvalidResponseError("xmla")
 
     return value
 
@@ -712,9 +615,7 @@ def _optional_bool(
         value,
         bool,
     ):
-        raise UpstreamInvalidResponseError(
-            "xmla"
-        )
+        raise UpstreamInvalidResponseError("xmla")
 
     return value
 
@@ -731,18 +632,13 @@ def _optional_int(
     if value is MISSING or value is None:
         return None
 
-    if (
-        not isinstance(
-            value,
-            int,
-        )
-        or isinstance(
-            value,
-            bool,
-        )
+    if not isinstance(
+        value,
+        int,
+    ) or isinstance(
+        value,
+        bool,
     ):
-        raise UpstreamInvalidResponseError(
-            "xmla"
-        )
+        raise UpstreamInvalidResponseError("xmla")
 
     return value

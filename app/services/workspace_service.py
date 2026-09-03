@@ -19,18 +19,13 @@ class WorkspaceService:
         top: int,
         skip: int,
     ) -> WorkspaceListResponse:
-        raw_workspaces = (
-            await self.client.get_workspaces(
-                access_token=access_token,
-                top=top,
-                skip=skip,
-            )
+        raw_workspaces = await self.client.get_workspaces(
+            access_token=access_token,
+            top=top,
+            skip=skip,
         )
 
-        workspaces = [
-            self._map_workspace(item)
-            for item in raw_workspaces
-        ]
+        workspaces = [self._map_workspace(item) for item in raw_workspaces]
 
         return WorkspaceListResponse(
             workspaces=workspaces,
@@ -45,16 +40,12 @@ class WorkspaceService:
         workspace_id: str,
         access_token: str,
     ) -> Workspace:
-        raw_workspace = (
-            await self.client.get_workspace(
-                workspace_id=workspace_id,
-                access_token=access_token,
-            )
+        raw_workspace = await self.client.get_workspace(
+            workspace_id=workspace_id,
+            access_token=access_token,
         )
 
-        return self._map_workspace(
-            raw_workspace
-        )
+        return self._map_workspace(raw_workspace)
 
     @staticmethod
     def _map_workspace(
@@ -63,21 +54,11 @@ class WorkspaceService:
         workspace_id = workspace.get("id")
         workspace_name = workspace.get("name")
 
-        if (
-            not isinstance(workspace_id, str)
-            or not workspace_id
-        ):
-            raise UpstreamInvalidResponseError(
-                "powerbi"
-            )
+        if not isinstance(workspace_id, str) or not workspace_id:
+            raise UpstreamInvalidResponseError("powerbi")
 
-        if (
-            not isinstance(workspace_name, str)
-            or not workspace_name
-        ):
-            raise UpstreamInvalidResponseError(
-                "powerbi"
-            )
+        if not isinstance(workspace_name, str) or not workspace_name:
+            raise UpstreamInvalidResponseError("powerbi")
 
         return Workspace(
             id=workspace_id,
@@ -94,12 +75,8 @@ class WorkspaceService:
                     False,
                 )
             ),
-            capacity_id=workspace.get(
-                "capacityId"
-            ),
+            capacity_id=workspace.get("capacityId"),
             default_dataset_storage_format=(
-                workspace.get(
-                    "defaultDatasetStorageFormat"
-                )
+                workspace.get("defaultDatasetStorageFormat")
             ),
         )

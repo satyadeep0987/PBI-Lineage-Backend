@@ -12,9 +12,7 @@ def _encode_segment(
     payload: dict[str, object],
 ) -> str:
     return (
-        base64.urlsafe_b64encode(
-            json.dumps(payload).encode("utf-8")
-        )
+        base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8"))
         .decode("ascii")
         .rstrip("=")
     )
@@ -23,18 +21,12 @@ def _encode_segment(
 def _token(
     payload: dict[str, object],
 ) -> str:
-    return (
-        f"{_encode_segment({'alg': 'none'})}."
-        f"{_encode_segment(payload)}."
-        "signature"
-    )
+    return f"{_encode_segment({'alg': 'none'})}.{_encode_segment(payload)}.signature"
 
 
 def test_get_scope_permission_from_resource_scope():
     assert (
-        get_scope_permission(
-            "https://api.fabric.microsoft.com/Item.ReadWrite.All"
-        )
+        get_scope_permission("https://api.fabric.microsoft.com/Item.ReadWrite.All")
         == "Item.ReadWrite.All"
     )
 
@@ -53,12 +45,7 @@ def test_normalize_scope_permissions_deduplicates():
 
 
 def test_extract_granted_scopes_from_result_scope():
-    result = {
-        "scope": (
-            "Workspace.Read.All "
-            "Item.ReadWrite.All"
-        )
-    }
+    result = {"scope": ("Workspace.Read.All Item.ReadWrite.All")}
 
     assert extract_granted_scopes(result) == [
         "Workspace.Read.All",
@@ -68,14 +55,7 @@ def test_extract_granted_scopes_from_result_scope():
 
 def test_extract_granted_scopes_from_jwt_scp():
     result = {
-        "access_token": _token(
-            {
-                "scp": (
-                    "Workspace.Read.All "
-                    "Item.ReadWrite.All"
-                )
-            }
-        )
+        "access_token": _token({"scp": ("Workspace.Read.All Item.ReadWrite.All")})
     }
 
     assert extract_granted_scopes(result) == [

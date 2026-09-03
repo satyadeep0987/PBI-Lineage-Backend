@@ -42,20 +42,11 @@ async def test_list_semantic_models_maps_powerbi_response():
     assert model.description == "Sales semantic model"
     assert model.is_refreshable is True
     assert model.is_effective_identity_required is False
-    assert (
-        model.is_effective_identity_roles_required
-        is False
-    )
+    assert model.is_effective_identity_roles_required is False
     assert model.is_on_prem_gateway_required is False
     assert model.target_storage_mode == "PremiumFiles"
-    assert (
-        model.content_provider_type
-        == "PbixInImportMode"
-    )
-    assert (
-        model.web_url
-        == "https://app.powerbi.com/model-1"
-    )
+    assert model.content_provider_type == "PbixInImportMode"
+    assert model.web_url == "https://app.powerbi.com/model-1"
 
 
 @pytest.mark.asyncio
@@ -85,18 +76,9 @@ async def test_read_only_semantic_model_with_only_id_and_name():
 
     assert model.description is None
     assert model.is_refreshable is None
-    assert (
-        model.is_effective_identity_required
-        is None
-    )
-    assert (
-        model.is_effective_identity_roles_required
-        is None
-    )
-    assert (
-        model.is_on_prem_gateway_required
-        is None
-    )
+    assert model.is_effective_identity_required is None
+    assert model.is_effective_identity_roles_required is None
+    assert model.is_on_prem_gateway_required is None
     assert model.target_storage_mode is None
     assert model.content_provider_type is None
     assert model.web_url is None
@@ -106,9 +88,7 @@ async def test_read_only_semantic_model_with_only_id_and_name():
 async def test_list_semantic_models_handles_empty_workspace():
     service = SemanticModelService()
 
-    service.client.get_semantic_models_in_workspace = AsyncMock(
-        return_value=[]
-    )
+    service.client.get_semantic_models_in_workspace = AsyncMock(return_value=[])
 
     result = await service.list_semantic_models(
         workspace_id="workspace-1",
@@ -132,9 +112,7 @@ async def test_semantic_model_missing_id_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_semantic_models(
             workspace_id="workspace-1",
             access_token="fake-token",
@@ -153,9 +131,7 @@ async def test_semantic_model_missing_name_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_semantic_models(
             workspace_id="workspace-1",
             access_token="fake-token",
@@ -175,9 +151,7 @@ async def test_semantic_model_empty_id_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_semantic_models(
             workspace_id="workspace-1",
             access_token="fake-token",
@@ -197,9 +171,7 @@ async def test_semantic_model_empty_name_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_semantic_models(
             workspace_id="workspace-1",
             access_token="fake-token",

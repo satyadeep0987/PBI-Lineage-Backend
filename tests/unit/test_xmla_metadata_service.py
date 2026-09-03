@@ -25,18 +25,13 @@ class _FakeXmlaClient:
     ) -> str:
         target = workspace_name or workspace_id
 
-        return (
-            "powerbi://api.powerbi.com/v1.0/"
-            f"myorg/{target}"
-        )
+        return f"powerbi://api.powerbi.com/v1.0/myorg/{target}"
 
     async def get_semantic_model_metadata(
         self,
         **kwargs,
     ) -> dict:
-        self.calls.append(
-            kwargs
-        )
+        self.calls.append(kwargs)
 
         return self.payload
 
@@ -67,9 +62,7 @@ class _FakePowerBIClient:
             ]
         )
         self.workspace_calls: list[dict] = []
-        self.semantic_model_calls: list[
-            dict
-        ] = []
+        self.semantic_model_calls: list[dict] = []
 
     async def get_workspace(
         self,
@@ -108,31 +101,23 @@ def _metadata_payload() -> dict:
         "tables": [
             {
                 "name": "Sales",
-                "description": (
-                    "Sales fact table"
-                ),
+                "description": ("Sales fact table"),
                 "isHidden": False,
                 "columns": [
                     {
                         "name": "Amount",
                         "dataType": "Decimal",
-                        "sourceColumn": (
-                            "SalesAmount"
-                        ),
+                        "sourceColumn": ("SalesAmount"),
                         "formatString": "$#,0.00",
                         "summarizeBy": "Sum",
                         "isHidden": False,
-                        "lineageTag": (
-                            "amount-lineage"
-                        ),
+                        "lineageTag": ("amount-lineage"),
                     }
                 ],
                 "measures": [
                     {
                         "name": "Total Sales",
-                        "expression": (
-                            "SUM(Sales[Amount])"
-                        ),
+                        "expression": ("SUM(Sales[Amount])"),
                         "formatString": "$#,0.00",
                         "isHidden": False,
                     }
@@ -142,9 +127,7 @@ def _metadata_payload() -> dict:
                         "name": "Sales",
                         "mode": "Import",
                         "sourceType": "M",
-                        "expression": (
-                            "let Source = ..."
-                        ),
+                        "expression": ("let Source = ..."),
                         "isRefreshable": True,
                     }
                 ],
@@ -179,9 +162,7 @@ def _metadata_payload() -> dict:
         "warnings": [
             {
                 "code": "XMLA_PARTIAL_METADATA",
-                "message": (
-                    "Some annotations were skipped."
-                ),
+                "message": ("Some annotations were skipped."),
                 "objectName": "Sales",
             }
         ],
@@ -190,9 +171,7 @@ def _metadata_payload() -> dict:
 
 @pytest.mark.asyncio
 async def test_get_xmla_metadata_maps_client_payload():
-    fake_client = _FakeXmlaClient(
-        _metadata_payload()
-    )
+    fake_client = _FakeXmlaClient(_metadata_payload())
     fake_powerbi_client = _FakePowerBIClient()
     service = XmlaMetadataService(
         xmla_client=fake_client,
@@ -208,14 +187,10 @@ async def test_get_xmla_metadata_maps_client_payload():
     )
 
     assert result.workspace_id == "workspace-123"
-    assert (
-        result.semantic_model_id
-        == "model-123"
-    )
+    assert result.semantic_model_id == "model-123"
     assert result.source == "xmla"
     assert result.xmla_endpoint == (
-        "powerbi://api.powerbi.com/v1.0/"
-        "myorg/Sales Workspace"
+        "powerbi://api.powerbi.com/v1.0/myorg/Sales Workspace"
     )
     assert result.database_name == "Sales Model"
     assert result.table_count == 1
@@ -228,33 +203,12 @@ async def test_get_xmla_metadata_maps_client_payload():
     table = result.tables[0]
 
     assert table.name == "Sales"
-    assert (
-        table.columns[0].source_column
-        == "SalesAmount"
-    )
-    assert (
-        table.measures[0].expression
-        == "SUM(Sales[Amount])"
-    )
-    assert (
-        table.partitions[0].source_type
-        == "M"
-    )
-    assert (
-        table.hierarchies[0]
-        .levels[0]
-        .ordinal
-        == 0
-    )
-    assert (
-        result.relationships[0]
-        .cross_filter_direction
-        == "Single"
-    )
-    assert (
-        result.warnings[0].code
-        == "XMLA_PARTIAL_METADATA"
-    )
+    assert table.columns[0].source_column == "SalesAmount"
+    assert table.measures[0].expression == "SUM(Sales[Amount])"
+    assert table.partitions[0].source_type == "M"
+    assert table.hierarchies[0].levels[0].ordinal == 0
+    assert result.relationships[0].cross_filter_direction == "Single"
+    assert result.warnings[0].code == "XMLA_PARTIAL_METADATA"
     assert fake_client.calls == [
         {
             "workspace_id": "workspace-123",
@@ -264,14 +218,8 @@ async def test_get_xmla_metadata_maps_client_payload():
             "database_name": "Sales Model",
         }
     ]
-    assert (
-        fake_powerbi_client.workspace_calls
-        == []
-    )
-    assert (
-        fake_powerbi_client.semantic_model_calls
-        == []
-    )
+    assert fake_powerbi_client.workspace_calls == []
+    assert fake_powerbi_client.semantic_model_calls == []
 
 
 @pytest.mark.asyncio
@@ -295,8 +243,7 @@ async def test_get_xmla_metadata_resolves_missing_names():
 
     assert result.database_name == "Sales Model"
     assert result.xmla_endpoint == (
-        "powerbi://api.powerbi.com/v1.0/"
-        "myorg/Sales Workspace"
+        "powerbi://api.powerbi.com/v1.0/myorg/Sales Workspace"
     )
     assert result.table_count == 0
     assert fake_client.calls == [
@@ -314,15 +261,12 @@ async def test_get_xmla_metadata_resolves_missing_names():
             "access_token": "token",
         }
     ]
-    assert (
-        fake_powerbi_client.semantic_model_calls
-        == [
-            {
-                "workspace_id": "workspace-123",
-                "access_token": "token",
-            }
-        ]
-    )
+    assert fake_powerbi_client.semantic_model_calls == [
+        {
+            "workspace_id": "workspace-123",
+            "access_token": "token",
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -333,14 +277,10 @@ async def test_get_xmla_metadata_rejects_unresolved_model_name():
                 "tables": [],
             }
         ),
-        powerbi_client=_FakePowerBIClient(
-            semantic_models=[]
-        ),
+        powerbi_client=_FakePowerBIClient(semantic_models=[]),
     )
 
-    with pytest.raises(
-        ProviderResourceNotFoundError
-    ):
+    with pytest.raises(ProviderResourceNotFoundError):
         await service.get_metadata(
             workspace_id="workspace-123",
             semantic_model_id="model-123",
@@ -355,9 +295,7 @@ async def test_get_xmla_metadata_rejects_missing_tables():
         powerbi_client=_FakePowerBIClient(),
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.get_metadata(
             workspace_id="workspace-123",
             semantic_model_id="model-123",
@@ -380,9 +318,7 @@ async def test_get_xmla_metadata_rejects_invalid_table_name():
         powerbi_client=_FakePowerBIClient(),
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.get_metadata(
             workspace_id="workspace-123",
             semantic_model_id="model-123",

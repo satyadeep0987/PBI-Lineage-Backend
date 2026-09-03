@@ -44,9 +44,7 @@ class _FakeXmlaConnection:
         self,
         query: str,
     ) -> list[dict[str, Any]]:
-        self.executed_queries.append(
-            query
-        )
+        self.executed_queries.append(query)
 
         return self.rowsets.get(
             query,
@@ -61,21 +59,15 @@ class _FakeConnectionFactory:
     ) -> None:
         self.rowsets = rowsets
         self.calls: list[dict[str, Any]] = []
-        self.connections: list[
-            _FakeXmlaConnection
-        ] = []
+        self.connections: list[_FakeXmlaConnection] = []
 
     def __call__(
         self,
         **kwargs,
     ) -> _FakeXmlaConnection:
         self.calls.append(kwargs)
-        connection = _FakeXmlaConnection(
-            self.rowsets
-        )
-        self.connections.append(
-            connection
-        )
+        connection = _FakeXmlaConnection(self.rowsets)
+        self.connections.append(connection)
 
         return connection
 
@@ -87,9 +79,7 @@ class _MissingConnectionFactory:
     ):
         raise ProviderIntegrationNotConfiguredError(
             "xmla",
-            detail=(
-                "Install pywin32 and MSOLAP."
-            ),
+            detail=("Install pywin32 and MSOLAP."),
         )
 
 
@@ -115,10 +105,7 @@ class _FailingConnection:
         self,
         query: str,
     ) -> list[dict[str, Any]]:
-        raise RuntimeError(
-            "XMLA failed for "
-            f"{self.connection_string}"
-        )
+        raise RuntimeError(f"XMLA failed for {self.connection_string}")
 
 
 class _FailingConnectionFactory:
@@ -127,9 +114,7 @@ class _FailingConnectionFactory:
         *,
         connection_string: str,
     ) -> _FailingConnection:
-        return _FailingConnection(
-            connection_string
-        )
+        return _FailingConnection(connection_string)
 
 
 class _MissingProviderComConnection:
@@ -138,8 +123,7 @@ class _MissingProviderComConnection:
         connection_string: str,
     ) -> None:
         raise RuntimeError(
-            "Provider cannot be found. It may "
-            "not be properly installed."
+            "Provider cannot be found. It may not be properly installed."
         )
 
     def Close(self) -> None:
@@ -155,9 +139,7 @@ def _rowsets() -> dict[
             {
                 "ID": 1,
                 "Name": "Sales",
-                "Description": (
-                    "Sales fact table"
-                ),
+                "Description": ("Sales fact table"),
                 "IsHidden": False,
             },
             {
@@ -172,15 +154,11 @@ def _rowsets() -> dict[
                 "TableID": 1,
                 "ExplicitName": "Amount",
                 "ExplicitDataType": "Decimal",
-                "SourceColumn": (
-                    "SalesAmount"
-                ),
+                "SourceColumn": ("SalesAmount"),
                 "FormatString": "$#,0.00",
                 "SummarizeBy": "Sum",
                 "IsHidden": False,
-                "LineageTag": (
-                    "amount-lineage"
-                ),
+                "LineageTag": ("amount-lineage"),
             },
             {
                 "ID": 12,
@@ -199,9 +177,7 @@ def _rowsets() -> dict[
                 "ID": 31,
                 "TableID": 1,
                 "Name": "Total Sales",
-                "Expression": (
-                    "SUM(Sales[Amount])"
-                ),
+                "Expression": ("SUM(Sales[Amount])"),
                 "FormatString": "$#,0.00",
                 "IsHidden": False,
             }
@@ -213,9 +189,7 @@ def _rowsets() -> dict[
                 "Name": "Sales",
                 "Mode": "Import",
                 "SourceType": "M",
-                "Expression": (
-                    "let Source = ..."
-                ),
+                "Expression": ("let Source = ..."),
                 "IsRefreshable": True,
             }
         ],
@@ -247,39 +221,27 @@ def _rowsets() -> dict[
                 "IsActive": True,
                 "Cardinality": "ManyToOne",
                 "CrossFilteringBehavior": "Single",
-                "SecurityFilteringBehavior": (
-                    "OneDirection"
-                ),
+                "SecurityFilteringBehavior": ("OneDirection"),
             }
         ],
     }
 
 
 def test_build_workspace_endpoint_encodes_workspace_name():
-    endpoint = XmlaClient(
-        tenant_name="myorg"
-    ).build_workspace_endpoint(
+    endpoint = XmlaClient(tenant_name="myorg").build_workspace_endpoint(
         workspace_id="workspace-123",
         workspace_name="Sales Workspace",
     )
 
-    assert endpoint == (
-        "powerbi://api.powerbi.com/v1.0/"
-        "myorg/Sales%20Workspace"
-    )
+    assert endpoint == ("powerbi://api.powerbi.com/v1.0/myorg/Sales%20Workspace")
 
 
 def test_build_workspace_endpoint_falls_back_to_workspace_id():
-    endpoint = XmlaClient(
-        tenant_name="myorg"
-    ).build_workspace_endpoint(
+    endpoint = XmlaClient(tenant_name="myorg").build_workspace_endpoint(
         workspace_id="workspace-123",
     )
 
-    assert endpoint == (
-        "powerbi://api.powerbi.com/v1.0/"
-        "myorg/workspace-123"
-    )
+    assert endpoint == ("powerbi://api.powerbi.com/v1.0/myorg/workspace-123")
 
 
 def test_build_connection_string_uses_initial_catalog():
@@ -305,22 +267,18 @@ def test_build_connection_string_uses_initial_catalog():
 
 @pytest.mark.asyncio
 async def test_xmla_metadata_reads_adodb_rowsets():
-    factory = _FakeConnectionFactory(
-        _rowsets()
-    )
+    factory = _FakeConnectionFactory(_rowsets())
     client = XmlaClient(
         connection_factory=factory,
         tenant_name="myorg",
     )
 
-    metadata = (
-        await client.get_semantic_model_metadata(
-            workspace_id="workspace-123",
-            semantic_model_id="model-123",
-            access_token="token",
-            workspace_name="Sales Workspace",
-            database_name="Sales Model",
-        )
+    metadata = await client.get_semantic_model_metadata(
+        workspace_id="workspace-123",
+        semantic_model_id="model-123",
+        access_token="token",
+        workspace_name="Sales Workspace",
+        database_name="Sales Model",
     )
 
     assert factory.calls == [
@@ -343,9 +301,7 @@ async def test_xmla_metadata_reads_adodb_rowsets():
         TMSCHEMA_LEVELS_QUERY,
         TMSCHEMA_RELATIONSHIPS_QUERY,
     ]
-    assert metadata["database_name"] == (
-        "Sales Model"
-    )
+    assert metadata["database_name"] == ("Sales Model")
     assert len(metadata["tables"]) == 2
 
     sales_table = metadata["tables"][0]
@@ -363,28 +319,13 @@ async def test_xmla_metadata_reads_adodb_rowsets():
         "description": None,
         "lineage_tag": "amount-lineage",
     }
-    assert (
-        sales_table["columns"][1][
-            "sort_by_column"
-        ]
-        == "DateKey"
-    )
-    assert (
-        sales_table["measures"][0]["expression"]
-        == "SUM(Sales[Amount])"
-    )
-    assert (
-        sales_table["partitions"][0]["source_type"]
-        == "M"
-    )
+    assert sales_table["columns"][1]["sort_by_column"] == "DateKey"
+    assert sales_table["measures"][0]["expression"] == "SUM(Sales[Amount])"
+    assert sales_table["partitions"][0]["source_type"] == "M"
 
     date_table = metadata["tables"][1]
 
-    assert (
-        date_table["hierarchies"][0]
-        ["levels"][0]["column"]
-        == "DateKey"
-    )
+    assert date_table["hierarchies"][0]["levels"][0]["column"] == "DateKey"
     assert metadata["relationships"] == [
         {
             "name": "Sales_Date",
@@ -395,9 +336,7 @@ async def test_xmla_metadata_reads_adodb_rowsets():
             "is_active": True,
             "cardinality": "ManyToOne",
             "cross_filter_direction": "Single",
-            "security_filtering_behavior": (
-                "OneDirection"
-            ),
+            "security_filtering_behavior": ("OneDirection"),
         }
     ]
     assert metadata["warnings"] == []
@@ -405,15 +344,9 @@ async def test_xmla_metadata_reads_adodb_rowsets():
 
 @pytest.mark.asyncio
 async def test_xmla_metadata_boundary_reports_missing_adapter():
-    client = XmlaClient(
-        connection_factory=(
-            _MissingConnectionFactory()
-        )
-    )
+    client = XmlaClient(connection_factory=(_MissingConnectionFactory()))
 
-    with pytest.raises(
-        ProviderIntegrationNotConfiguredError
-    ) as exc_info:
+    with pytest.raises(ProviderIntegrationNotConfiguredError) as exc_info:
         await client.get_semantic_model_metadata(
             workspace_id="workspace-123",
             semantic_model_id="model-123",
@@ -423,40 +356,21 @@ async def test_xmla_metadata_boundary_reports_missing_adapter():
         )
 
     assert exc_info.value.provider == "xmla"
-    assert exc_info.value.code == (
-        "PROVIDER_INTEGRATION_NOT_CONFIGURED"
-    )
-    assert (
-        "Install pywin32"
-        in exc_info.value.message
-    )
+    assert exc_info.value.code == ("PROVIDER_INTEGRATION_NOT_CONFIGURED")
+    assert "Install pywin32" in exc_info.value.message
 
 
 def test_adocom_connection_reports_missing_msolap_provider(
     monkeypatch,
 ):
-    fake_pythoncom = types.ModuleType(
-        "pythoncom"
-    )
-    fake_pythoncom.CoInitialize = (
-        lambda: None
-    )
-    fake_pythoncom.CoUninitialize = (
-        lambda: None
-    )
+    fake_pythoncom = types.ModuleType("pythoncom")
+    fake_pythoncom.CoInitialize = lambda: None
+    fake_pythoncom.CoUninitialize = lambda: None
 
-    fake_win32com = types.ModuleType(
-        "win32com"
-    )
-    fake_win32com_client = types.ModuleType(
-        "win32com.client"
-    )
-    fake_win32com_client.Dispatch = (
-        lambda name: _MissingProviderComConnection()
-    )
-    fake_win32com.client = (
-        fake_win32com_client
-    )
+    fake_win32com = types.ModuleType("win32com")
+    fake_win32com_client = types.ModuleType("win32com.client")
+    fake_win32com_client.Dispatch = lambda name: _MissingProviderComConnection()
+    fake_win32com.client = fake_win32com_client
 
     monkeypatch.setitem(
         sys.modules,
@@ -474,31 +388,22 @@ def test_adocom_connection_reports_missing_msolap_provider(
         fake_win32com_client,
     )
 
-    with pytest.raises(
-        ProviderIntegrationNotConfiguredError
-    ) as exc_info, AdoComXmlaConnection(
-        connection_string="Provider=MSOLAP;"
+    with (
+        pytest.raises(ProviderIntegrationNotConfiguredError) as exc_info,
+        AdoComXmlaConnection(connection_string="Provider=MSOLAP;"),
     ):
         pass
 
     assert exc_info.value.provider == "xmla"
-    assert exc_info.value.code == (
-        "PROVIDER_INTEGRATION_NOT_CONFIGURED"
-    )
+    assert exc_info.value.code == ("PROVIDER_INTEGRATION_NOT_CONFIGURED")
     assert "MSOLAP" in exc_info.value.message
 
 
 @pytest.mark.asyncio
 async def test_xmla_metadata_redacts_access_token_from_failure():
-    client = XmlaClient(
-        connection_factory=(
-            _FailingConnectionFactory()
-        )
-    )
+    client = XmlaClient(connection_factory=(_FailingConnectionFactory()))
 
-    with pytest.raises(
-        UpstreamRequestError
-    ) as exc_info:
+    with pytest.raises(UpstreamRequestError) as exc_info:
         await client.get_semantic_model_metadata(
             workspace_id="workspace-123",
             semantic_model_id="model-123",
@@ -507,9 +412,5 @@ async def test_xmla_metadata_redacts_access_token_from_failure():
             database_name="Sales Model",
         )
 
-    assert "secret-token" not in (
-        exc_info.value.message
-    )
-    assert "[redacted]" in (
-        exc_info.value.message
-    )
+    assert "secret-token" not in (exc_info.value.message)
+    assert "[redacted]" in (exc_info.value.message)

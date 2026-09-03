@@ -38,9 +38,7 @@ def _build_request() -> LineageGraphBuildRequest:
                     ParsedSemanticModelPartition(
                         name="Sales",
                         source_type="m",
-                        expression=(
-                            'Sql.Database("sql.example.com", "warehouse")'
-                        ),
+                        expression=('Sql.Database("sql.example.com", "warehouse")'),
                     )
                 ],
             )

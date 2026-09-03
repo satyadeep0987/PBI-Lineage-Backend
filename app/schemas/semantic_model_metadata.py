@@ -35,9 +35,7 @@ class SemanticModelMetadataReconciliation(BaseModel):
     matched_count: int
     definition_only_count: int
     xmla_only_count: int
-    matches: list[SemanticModelMetadataMatch] = Field(
-        default_factory=list
-    )
+    matches: list[SemanticModelMetadataMatch] = Field(default_factory=list)
 
 
 class SemanticModelMetadataResponse(BaseModel):

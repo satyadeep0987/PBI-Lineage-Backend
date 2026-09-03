@@ -88,7 +88,5 @@ class XmlaSemanticModelMetadataResponse(BaseModel):
     partition_count: int
 
     tables: list[XmlaSemanticModelTable] = Field(default_factory=list)
-    relationships: list[XmlaSemanticModelRelationship] = Field(
-        default_factory=list
-    )
+    relationships: list[XmlaSemanticModelRelationship] = Field(default_factory=list)
     warnings: list[XmlaMetadataWarning] = Field(default_factory=list)

@@ -12,9 +12,7 @@ from app.core.exceptions import (
 
 
 class FabricClient:
-    BASE_URL = (
-        "https://api.fabric.microsoft.com/v1"
-    )
+    BASE_URL = "https://api.fabric.microsoft.com/v1"
 
     @staticmethod
     def _parse_object_response(
@@ -24,17 +22,13 @@ class FabricClient:
             payload = response.json()
 
         except ValueError as exc:
-            raise UpstreamInvalidResponseError(
-                "fabric"
-            ) from exc
+            raise UpstreamInvalidResponseError("fabric") from exc
 
         if not isinstance(
             payload,
             dict,
         ):
-            raise UpstreamInvalidResponseError(
-                "fabric"
-            )
+            raise UpstreamInvalidResponseError("fabric")
 
         return payload
 
@@ -44,9 +38,7 @@ class FabricClient:
     ) -> bool:
         await provider_get(
             provider="fabric",
-            url=(
-                f"{self.BASE_URL}/workspaces"
-            ),
+            url=(f"{self.BASE_URL}/workspaces"),
             access_token=access_token,
         )
 
@@ -64,9 +56,7 @@ class FabricClient:
 
         if definition_format:
             params = {
-                "format": (
-                    definition_format
-                ),
+                "format": (definition_format),
             }
 
         return await provider_post(
@@ -101,9 +91,7 @@ class FabricClient:
             params={
                 "format": definition_format,
             },
-            not_found_resource=(
-                "semantic_model"
-            ),
+            not_found_resource=("semantic_model"),
         )
 
     async def get_operation_state(
@@ -114,10 +102,7 @@ class FabricClient:
     ) -> httpx.Response:
         return await provider_get(
             provider="fabric",
-            url=(
-                f"{self.BASE_URL}/operations/"
-                f"{operation_id}"
-            ),
+            url=(f"{self.BASE_URL}/operations/{operation_id}"),
             access_token=access_token,
         )
 
@@ -129,9 +114,6 @@ class FabricClient:
     ) -> httpx.Response:
         return await provider_get(
             provider="fabric",
-            url=(
-                f"{self.BASE_URL}/operations/"
-                f"{operation_id}/result"
-            ),
+            url=(f"{self.BASE_URL}/operations/{operation_id}/result"),
             access_token=access_token,
         )

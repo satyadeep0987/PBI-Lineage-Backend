@@ -91,9 +91,7 @@ in
 
 
 def test_gateway_details_are_sanitized_and_matched_to_query_source():
-    model = _semantic_model(
-        'Sql.Database("sql.example.com", "warehouse")'
-    )
+    model = _semantic_model('Sql.Database("sql.example.com", "warehouse")')
     gateway = GatewayDatasource(
         id="datasource-1",
         gateway_id="gateway-1",
@@ -109,7 +107,9 @@ def test_gateway_details_are_sanitized_and_matched_to_query_source():
         gateway_datasources=[gateway],
     )
 
-    query_source = next(source for source in result.sources if source.provider == "sqlserver")
+    query_source = next(
+        source for source in result.sources if source.provider == "sqlserver"
+    )
     assert query_source.gateway_id == "gateway-1"
     assert query_source.gateway_datasource_id == "datasource-1"
     assert "username" not in query_source.model_dump()
@@ -129,7 +129,9 @@ def test_invalid_gateway_connection_details_adds_warning():
     )
 
     assert result.warnings[-1].code == "GATEWAY_CONNECTION_DETAILS_INVALID"
-    assert all(source.gateway_datasource_id != "datasource-1" for source in result.sources)
+    assert all(
+        source.gateway_datasource_id != "datasource-1" for source in result.sources
+    )
 
 
 def test_calculated_partition_is_not_treated_as_physical_source():

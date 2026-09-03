@@ -15,17 +15,13 @@ def _response() -> MicrosoftServicePrincipalAuthResponse:
         powerbi=MicrosoftApplicationTokenResult(
             token_acquired=True,
             resource="https://analysis.windows.net/powerbi/api",
-            requested_scope=(
-                "https://analysis.windows.net/powerbi/api/.default"
-            ),
+            requested_scope=("https://analysis.windows.net/powerbi/api/.default"),
             message="Power BI application token acquired.",
         ),
         fabric=MicrosoftApplicationTokenResult(
             token_acquired=True,
             resource="https://api.fabric.microsoft.com",
-            requested_scope=(
-                "https://api.fabric.microsoft.com/.default"
-            ),
+            requested_scope=("https://api.fabric.microsoft.com/.default"),
             message="Fabric application token acquired.",
         ),
     )
@@ -64,9 +60,7 @@ def test_service_principal_authentication_sets_cookie_and_redacts_secret(
     )
 
     assert response.status_code == 200
-    assert response.cookies.get(AUTH_SESSION_COOKIE) == (
-        "service-principal-session"
-    )
+    assert response.cookies.get(AUTH_SESSION_COOKIE) == ("service-principal-session")
     assert "HttpOnly" in response.headers["set-cookie"]
     assert "secret-value" not in response.text
     client.cookies.clear()
@@ -90,9 +84,7 @@ def test_service_principal_status_uses_session_cookie(
         "service-principal-session",
     )
 
-    response = client.get(
-        "/api/v1/auth/microsoft/service-principal/session/status"
-    )
+    response = client.get("/api/v1/auth/microsoft/service-principal/session/status")
 
     assert response.status_code == 200
     assert response.json()["authentication_method"] == "client_secret"

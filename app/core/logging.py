@@ -8,9 +8,7 @@ from typing import Any
 from app.core.request_context import get_request_id
 
 _SENSITIVE_PATTERNS = (
-    re.compile(
-        r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+"
-    ),
+    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+"),
     re.compile(
         r"(?i)"
         r"(access_token|refresh_token|client_secret|"
@@ -46,31 +44,23 @@ def redact_sensitive_value(
     )
 
     sanitized = _SENSITIVE_PATTERNS[1].sub(
-        lambda match: (
-            f"{match.group(1)}=[REDACTED]"
-        ),
+        lambda match: f"{match.group(1)}=[REDACTED]",
         sanitized,
     )
 
     return sanitized
 
 
-class CredentialSafeJsonFormatter(
-    logging.Formatter
-):
+class CredentialSafeJsonFormatter(logging.Formatter):
     def format(
         self,
         record: logging.LogRecord,
     ) -> str:
         payload: dict[str, Any] = {
-            "timestamp": datetime.now(
-                UTC
-            ).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
-            "message": redact_sensitive_value(
-                record.getMessage()
-            ),
+            "message": redact_sensitive_value(record.getMessage()),
         }
 
         request_id = getattr(
@@ -83,11 +73,7 @@ class CredentialSafeJsonFormatter(
             request_id = get_request_id()
 
         if request_id != "unknown":
-            payload["request_id"] = (
-                redact_sensitive_value(
-                    request_id
-                )
-            )
+            payload["request_id"] = redact_sensitive_value(request_id)
 
         for field in _ALLOWED_EXTRA_FIELDS:
             if field == "request_id":
@@ -99,27 +85,17 @@ class CredentialSafeJsonFormatter(
                     field,
                 )
 
-                payload[field] = (
-                    redact_sensitive_value(
-                        value
-                    )
-                )
+                payload[field] = redact_sensitive_value(value)
 
         if record.exc_info:
             exception = record.exc_info[1]
 
             payload["exception_type"] = (
-                type(exception).__name__
-                if exception
-                else "UnknownException"
+                type(exception).__name__ if exception else "UnknownException"
             )
 
             if exception:
-                payload["exception_message"] = (
-                    redact_sensitive_value(
-                        str(exception)
-                    )
-                )
+                payload["exception_message"] = redact_sensitive_value(str(exception))
 
         return json.dumps(
             payload,
@@ -137,13 +113,9 @@ def configure_logging(
         logging.INFO,
     )
 
-    handler = logging.StreamHandler(
-        sys.stdout
-    )
+    handler = logging.StreamHandler(sys.stdout)
 
-    handler.setFormatter(
-        CredentialSafeJsonFormatter()
-    )
+    handler.setFormatter(CredentialSafeJsonFormatter())
 
     root_logger = logging.getLogger()
 
@@ -153,18 +125,14 @@ def configure_logging(
 
     # We emit our own HTTP request logs.
     # Avoid duplicate Uvicorn access logs.
-    logging.getLogger(
-        "uvicorn.access"
-    ).disabled = True
+    logging.getLogger("uvicorn.access").disabled = True
 
     for logger_name in (
         "uvicorn",
         "uvicorn.error",
         "fastapi",
     ):
-        logger = logging.getLogger(
-            logger_name
-        )
+        logger = logging.getLogger(logger_name)
 
         logger.handlers.clear()
         logger.propagate = True

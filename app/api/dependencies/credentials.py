@@ -36,14 +36,10 @@ async def get_bearer_token(
     ],
 ) -> str:
     if credentials is None:
-        raise (
-            MissingAuthenticationCredentialsError()
-        )
+        raise (MissingAuthenticationCredentialsError())
 
     if credentials.scheme.lower() != "bearer":
-        raise (
-            InvalidAuthenticationSchemeError()
-        )
+        raise (InvalidAuthenticationSchemeError())
 
     return credentials.credentials
 
@@ -55,34 +51,23 @@ async def get_powerbi_access_token(
     ),
 ) -> str:
     if not session_id:
-        raise (
-            MissingAuthenticationCredentialsError()
-        )
+        raise (MissingAuthenticationCredentialsError())
 
-    session = get_device_session(
-        session_id
-    )
+    session = get_device_session(session_id)
 
     if session is None:
-        raise (
-            MissingAuthenticationCredentialsError()
-        )
+        raise (MissingAuthenticationCredentialsError())
 
     if session.status == "pending":
-        raise (
-            MissingAuthenticationCredentialsError()
-        )
+        raise (MissingAuthenticationCredentialsError())
 
-    token = get_powerbi_token(
-        session_id
-    )
+    token = get_powerbi_token(session_id)
 
     if token is None:
-        raise InvalidAccessTokenError(
-            "powerbi"
-        )
+        raise InvalidAccessTokenError("powerbi")
 
     return token
+
 
 async def get_fabric_access_token(
     session_id: str | None = Cookie(
@@ -91,27 +76,17 @@ async def get_fabric_access_token(
     ),
 ) -> str:
     if not session_id:
-        raise (
-            AuthenticationSessionRequiredError()
-        )
+        raise (AuthenticationSessionRequiredError())
 
-    session = get_device_session(
-        session_id
-    )
+    session = get_device_session(session_id)
 
     if session is None:
-        raise (
-            AuthenticationSessionExpiredError()
-        )
+        raise (AuthenticationSessionExpiredError())
 
-    token = get_fabric_token(
-        session_id
-    )
+    token = get_fabric_token(session_id)
 
     if token is None:
-        raise ProviderAuthenticationRequiredError(
-            provider="fabric"
-        )
+        raise ProviderAuthenticationRequiredError(provider="fabric")
 
     return token
 

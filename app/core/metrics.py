@@ -59,8 +59,7 @@ class MetricsRegistry:
         for (method, route), total in sorted(duration_sums.items()):
             labels = f'method="{_escape(method)}",route="{_escape(route)}"'
             lines.append(
-                "pbi_lineage_http_request_duration_seconds_sum"
-                f"{{{labels}}} {total:.6f}"
+                f"pbi_lineage_http_request_duration_seconds_sum{{{labels}}} {total:.6f}"
             )
             lines.append(
                 "pbi_lineage_http_request_duration_seconds_count"
@@ -132,10 +131,7 @@ _LINEAGE_ID_SEGMENT = re.compile(r"^[a-z_]+:[0-9a-f]{16,64}$")
 
 
 def _normalized_route(path: str, path_params: dict[str, object]) -> str:
-    parameter_values = {
-        str(value): name
-        for name, value in path_params.items()
-    }
+    parameter_values = {str(value): name for name, value in path_params.items()}
     segments = []
     for segment in path.split("/"):
         if segment in parameter_values:

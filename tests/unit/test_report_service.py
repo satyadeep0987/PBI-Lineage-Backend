@@ -75,9 +75,7 @@ async def test_list_reports_allows_missing_dataset_id():
 async def test_list_reports_handles_empty_workspace():
     service = ReportService()
 
-    service.client.get_reports_in_workspace = AsyncMock(
-        return_value=[]
-    )
+    service.client.get_reports_in_workspace = AsyncMock(return_value=[])
 
     result = await service.list_reports(
         workspace_id="workspace-1",
@@ -102,9 +100,7 @@ async def test_report_missing_id_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_reports(
             workspace_id="workspace-1",
             access_token="fake-token",
@@ -124,9 +120,7 @@ async def test_report_missing_name_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_reports(
             workspace_id="workspace-1",
             access_token="fake-token",
@@ -146,9 +140,7 @@ async def test_report_empty_id_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_reports(
             workspace_id="workspace-1",
             access_token="fake-token",
@@ -168,13 +160,12 @@ async def test_report_empty_name_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_reports(
             workspace_id="workspace-1",
             access_token="fake-token",
         )
+
 
 @pytest.mark.asyncio
 async def test_get_report_maps_report_detail():
@@ -188,10 +179,7 @@ async def test_get_report_maps_report_detail():
             "description": "Executive sales report",
             "reportType": "PowerBIReport",
             "format": "PBIR",
-            "webUrl": (
-                "https://app.powerbi.com/"
-                "report-1"
-            ),
+            "webUrl": ("https://app.powerbi.com/report-1"),
             "isOwnedByMe": True,
         }
     )
@@ -205,14 +193,8 @@ async def test_get_report_maps_report_detail():
     assert result.id == "report-1"
     assert result.name == "Sales Report"
     assert result.dataset_id == "dataset-1"
-    assert (
-        result.description
-        == "Executive sales report"
-    )
-    assert (
-        result.report_type
-        == "PowerBIReport"
-    )
+    assert result.description == "Executive sales report"
+    assert result.report_type == "PowerBIReport"
     assert result.format == "PBIR"
     assert result.is_owned_by_me is True
 
@@ -272,22 +254,13 @@ async def test_list_pages_maps_pages():
     assert result.report_id == "report-1"
     assert result.count == 2
 
-    assert (
-        result.pages[0].name
-        == "ReportSection"
-    )
+    assert result.pages[0].name == "ReportSection"
 
-    assert (
-        result.pages[0].display_name
-        == "Executive Summary"
-    )
+    assert result.pages[0].display_name == "Executive Summary"
 
     assert result.pages[0].order == 0
 
-    assert (
-        result.pages[1].name
-        == "ReportSection2"
-    )
+    assert result.pages[1].name == "ReportSection2"
 
     assert result.pages[1].order == 1
 
@@ -296,9 +269,7 @@ async def test_list_pages_maps_pages():
 async def test_list_pages_handles_empty_report():
     service = ReportService()
 
-    service.client.get_report_pages = AsyncMock(
-        return_value=[]
-    )
+    service.client.get_report_pages = AsyncMock(return_value=[])
 
     result = await service.list_pages(
         workspace_id="workspace-1",
@@ -329,15 +300,9 @@ async def test_get_single_page():
         access_token="fake-token",
     )
 
-    assert (
-        result.name
-        == "ReportSection"
-    )
+    assert result.name == "ReportSection"
 
-    assert (
-        result.display_name
-        == "Executive Summary"
-    )
+    assert result.display_name == "Executive Summary"
 
     assert result.order == 0
 
@@ -355,9 +320,7 @@ async def test_page_missing_name_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_pages(
             workspace_id="workspace-1",
             report_id="report-1",
@@ -378,9 +341,7 @@ async def test_page_missing_display_name_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_pages(
             workspace_id="workspace-1",
             report_id="report-1",
@@ -402,9 +363,7 @@ async def test_invalid_page_order_raises_invalid_response():
         ]
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
+    with pytest.raises(UpstreamInvalidResponseError):
         await service.list_pages(
             workspace_id="workspace-1",
             report_id="report-1",

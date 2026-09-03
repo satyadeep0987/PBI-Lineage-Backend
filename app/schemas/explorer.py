@@ -32,13 +32,10 @@ class ExplorerRequest(BaseModel):
     @model_validator(mode="after")
     def reports_must_be_unique(self) -> "ExplorerRequest":
         report_keys = [
-            (selection.workspace_id, selection.report_id)
-            for selection in self.reports
+            (selection.workspace_id, selection.report_id) for selection in self.reports
         ]
         if len(report_keys) != len(set(report_keys)):
-            raise ValueError(
-                "Each workspace/report selection must be unique."
-            )
+            raise ValueError("Each workspace/report selection must be unique.")
         return self
 
 
@@ -157,9 +154,7 @@ class ReportLayoutRow(BaseModel):
     report_name: str
     semantic_model_id: str | None = None
     app_name: str | None = None
-    metadata_source: Literal["fabric_report_definition"] = (
-        "fabric_report_definition"
-    )
+    metadata_source: Literal["fabric_report_definition"] = "fabric_report_definition"
     report_definition_format: str
     definition_part_count: int = Field(ge=0)
     page_id: str

@@ -65,8 +65,7 @@ class UpstreamRateLimitError(AppException):
         super().__init__(
             code="UPSTREAM_RATE_LIMITED",
             message=(
-                f"{_provider_label(provider)} is currently "
-                "rate limiting requests."
+                f"{_provider_label(provider)} is currently rate limiting requests."
             ),
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             provider=provider,
@@ -79,8 +78,7 @@ class UpstreamTimeoutError(AppException):
         super().__init__(
             code="UPSTREAM_TIMEOUT",
             message=(
-                f"{_provider_label(provider)} did not respond "
-                "within the allowed time."
+                f"{_provider_label(provider)} did not respond within the allowed time."
             ),
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             provider=provider,
@@ -91,9 +89,7 @@ class UpstreamUnavailableError(AppException):
     def __init__(self, provider: str) -> None:
         super().__init__(
             code="UPSTREAM_SERVICE_UNAVAILABLE",
-            message=(
-                f"{_provider_label(provider)} is currently unavailable."
-            ),
+            message=(f"{_provider_label(provider)} is currently unavailable."),
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             provider=provider,
         )
@@ -104,8 +100,7 @@ class UpstreamRequestError(AppException):
         super().__init__(
             code="UPSTREAM_REQUEST_FAILED",
             message=(
-                f"The request to {_provider_label(provider)} could not "
-                "be completed."
+                f"The request to {_provider_label(provider)} could not be completed."
             ),
             status_code=status.HTTP_502_BAD_GATEWAY,
             provider=provider,

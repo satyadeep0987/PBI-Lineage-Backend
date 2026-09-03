@@ -59,9 +59,7 @@ class FakeScannerClient:
                 }
             ],
             "datasourceInstances": [{"datasourceId": "source-1"}],
-            "misconfiguredDatasourceInstances": [
-                {"datasourceId": "source-2"}
-            ],
+            "misconfiguredDatasourceInstances": [{"datasourceId": "source-2"}],
         }
 
 
@@ -77,9 +75,7 @@ async def test_list_modified_workspaces_normalizes_timestamp():
 
     assert result.count == 1
     assert str(result.workspaces[0]) == WORKSPACE_ID
-    assert client.modified_arguments["modified_since"] == (
-        "2026-09-01T00:00:00Z"
-    )
+    assert client.modified_arguments["modified_since"] == ("2026-09-01T00:00:00Z")
 
 
 @pytest.mark.asyncio
@@ -111,9 +107,7 @@ async def test_scan_result_preserves_payload_and_builds_summary():
         scan_id=SCAN_ID,
     )
 
-    assert result.payload["workspaces"][0]["datasets"][0]["id"] == (
-        "model-1"
-    )
+    assert result.payload["workspaces"][0]["datasets"][0]["id"] == ("model-1")
     assert result.summary.workspace_count == 1
     assert result.summary.report_count == 1
     assert result.summary.semantic_model_count == 1

@@ -125,14 +125,11 @@ async def test_snowflake_client_retrieves_all_result_partitions(monkeypatch):
     provider_get.assert_awaited_once_with(
         provider="snowflake",
         url=(
-            "https://org-account.snowflakecomputing.com/api/v2/"
-            "statements/statement-1"
+            "https://org-account.snowflakecomputing.com/api/v2/statements/statement-1"
         ),
         access_token="snowflake-token",
         params={"partition": 1},
-        additional_headers={
-            "X-Snowflake-Authorization-Token-Type": "OAUTH"
-        },
+        additional_headers={"X-Snowflake-Authorization-Token-Type": "OAUTH"},
     )
 
 

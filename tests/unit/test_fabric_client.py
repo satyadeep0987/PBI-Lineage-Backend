@@ -21,13 +21,10 @@ async def test_start_report_definition_uses_pbir_default(
         fake_provider_post,
     )
 
-    result = await (
-        FabricClient()
-        .start_report_definition(
-            workspace_id="workspace-123",
-            report_id="report-123",
-            access_token="token",
-        )
+    result = await FabricClient().start_report_definition(
+        workspace_id="workspace-123",
+        report_id="report-123",
+        access_token="token",
     )
 
     assert result == "fabric-response"
@@ -40,9 +37,7 @@ async def test_start_report_definition_uses_pbir_default(
             "getDefinition"
         ),
         "access_token": "token",
-        "params": {
-            "format": "PBIR"
-        },
+        "params": {"format": "PBIR"},
         "not_found_resource": "report",
     }
 
@@ -64,14 +59,11 @@ async def test_start_semantic_model_definition_calls_fabric_get_definition(
         fake_provider_post,
     )
 
-    result = await (
-        FabricClient()
-        .start_semantic_model_definition(
-            workspace_id="workspace-123",
-            semantic_model_id="model-123",
-            access_token="token",
-            definition_format="TMSL",
-        )
+    result = await FabricClient().start_semantic_model_definition(
+        workspace_id="workspace-123",
+        semantic_model_id="model-123",
+        access_token="token",
+        definition_format="TMSL",
     )
 
     assert result == "fabric-response"
@@ -84,10 +76,6 @@ async def test_start_semantic_model_definition_calls_fabric_get_definition(
             "getDefinition"
         ),
         "access_token": "token",
-        "params": {
-            "format": "TMSL"
-        },
-        "not_found_resource": (
-            "semantic_model"
-        ),
+        "params": {"format": "TMSL"},
+        "not_found_resource": ("semantic_model"),
     }

@@ -23,9 +23,7 @@ from app.services.auth.snowflake_session_store import (
 
 settings = get_settings()
 
-configure_logging(
-    settings.log_level
-)
+configure_logging(settings.log_level)
 
 
 @asynccontextmanager

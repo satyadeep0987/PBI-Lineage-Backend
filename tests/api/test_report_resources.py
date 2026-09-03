@@ -54,17 +54,11 @@ from app.services.xmla_metadata_service import (
     XmlaMetadataService,
 )
 
-WORKSPACE_ID = (
-    "f089354e-8366-4e18-aea3-4cb4a3a50b48"
-)
+WORKSPACE_ID = "f089354e-8366-4e18-aea3-4cb4a3a50b48"
 
-REPORT_ID = (
-    "879445d6-3a9e-4a74-b5ae-7c0ddabf0f11"
-)
+REPORT_ID = "879445d6-3a9e-4a74-b5ae-7c0ddabf0f11"
 
-SEMANTIC_MODEL_ID = (
-    "cfafbeb1-8037-4d0c-896e-a46fb27ff229"
-)
+SEMANTIC_MODEL_ID = "cfafbeb1-8037-4d0c-896e-a46fb27ff229"
 
 
 @pytest.fixture(autouse=True)
@@ -75,12 +69,8 @@ def override_authentication():
     async def fake_fabric_token() -> str:
         return "fake-fabric-token"
 
-    app.dependency_overrides[
-        get_powerbi_access_token
-    ] = fake_powerbi_token
-    app.dependency_overrides[
-        get_fabric_access_token
-    ] = fake_fabric_token
+    app.dependency_overrides[get_powerbi_access_token] = fake_powerbi_token
+    app.dependency_overrides[get_fabric_access_token] = fake_fabric_token
 
     yield
 
@@ -119,13 +109,7 @@ def test_get_report(
         fake_get_report,
     )
 
-    response = client.get(
-        
-            f"/api/v1/workspaces/"
-            f"{WORKSPACE_ID}/reports/"
-            f"{REPORT_ID}"
-        
-    )
+    response = client.get(f"/api/v1/workspaces/{WORKSPACE_ID}/reports/{REPORT_ID}")
 
     assert response.status_code == 200
 
@@ -160,16 +144,11 @@ def test_get_my_workspace_report(
         fake_get_my_workspace_report,
     )
 
-    response = client.get(
-        f"/api/v1/reports/{REPORT_ID}"
-    )
+    response = client.get(f"/api/v1/reports/{REPORT_ID}")
 
     assert response.status_code == 200
     assert response.json()["id"] == REPORT_ID
-    assert (
-        response.json()["name"]
-        == "My Workspace Sales Report"
-    )
+    assert response.json()["name"] == "My Workspace Sales Report"
 
 
 def test_list_report_pages(
@@ -189,9 +168,7 @@ def test_list_report_pages(
             pages=[
                 ReportPage(
                     name="ReportSection",
-                    display_name=(
-                        "Executive Summary"
-                    ),
+                    display_name=("Executive Summary"),
                     order=0,
                 )
             ],
@@ -205,11 +182,7 @@ def test_list_report_pages(
     )
 
     response = client.get(
-        
-            f"/api/v1/workspaces/"
-            f"{WORKSPACE_ID}/reports/"
-            f"{REPORT_ID}/pages"
-        
+        f"/api/v1/workspaces/{WORKSPACE_ID}/reports/{REPORT_ID}/pages"
     )
 
     assert response.status_code == 200
@@ -218,10 +191,7 @@ def test_list_report_pages(
 
     assert payload["count"] == 1
 
-    assert (
-        payload["pages"][0]["name"]
-        == "ReportSection"
-    )
+    assert payload["pages"][0]["name"] == "ReportSection"
 
 
 def test_get_report_page(
@@ -249,38 +219,23 @@ def test_get_report_page(
     )
 
     response = client.get(
-        
-            f"/api/v1/workspaces/"
-            f"{WORKSPACE_ID}/reports/"
-            f"{REPORT_ID}/pages/"
-            f"ReportSection"
-        
+        f"/api/v1/workspaces/{WORKSPACE_ID}/reports/{REPORT_ID}/pages/ReportSection"
     )
 
     assert response.status_code == 200
 
     payload = response.json()
 
-    assert (
-        payload["name"]
-        == "ReportSection"
-    )
+    assert payload["name"] == "ReportSection"
 
-    assert (
-        payload["display_name"]
-        == "Executive Summary"
-    )
+    assert payload["display_name"] == "Executive Summary"
 
 
 def test_invalid_report_uuid(
     client,
 ):
     response = client.get(
-        
-            f"/api/v1/workspaces/"
-            f"{WORKSPACE_ID}/reports/"
-            f"invalid-report-id"
-        
+        f"/api/v1/workspaces/{WORKSPACE_ID}/reports/invalid-report-id"
     )
 
     assert response.status_code == 422
@@ -312,9 +267,7 @@ def test_get_report_definition_uses_pbir_default(
                     ReportDefinitionPart(
                         path="definition.pbir",
                         payload="e30=",
-                        payload_type=(
-                            "InlineBase64"
-                        ),
+                        payload_type=("InlineBase64"),
                     )
                 ],
             ),
@@ -327,27 +280,21 @@ def test_get_report_definition_uses_pbir_default(
     )
 
     response = client.post(
-        f"/api/v1/workspaces/{WORKSPACE_ID}/"
-        f"reports/{REPORT_ID}/definition"
+        f"/api/v1/workspaces/{WORKSPACE_ID}/reports/{REPORT_ID}/definition"
     )
 
     assert response.status_code == 200
 
     payload = response.json()
 
-    assert (
-        payload["definition"]["format"]
-        == "PBIR"
-    )
+    assert payload["definition"]["format"] == "PBIR"
 
 
 def test_report_definition_rejects_semantic_model_format(
     client,
 ):
     response = client.post(
-        f"/api/v1/workspaces/{WORKSPACE_ID}/"
-        f"reports/{REPORT_ID}/definition"
-        "?format=TMDL"
+        f"/api/v1/workspaces/{WORKSPACE_ID}/reports/{REPORT_ID}/definition?format=TMDL"
     )
 
     assert response.status_code == 422
@@ -389,15 +336,9 @@ def test_get_semantic_model_definition(
                 format=definition_format,
                 parts=[
                     SemanticModelDefinitionPart(
-                        path=(
-                            "definition/model.tmdl"
-                        ),
-                        payload=(
-                            "bW9kZWwgTW9kZWw="
-                        ),
-                        payload_type=(
-                            "InlineBase64"
-                        ),
+                        path=("definition/model.tmdl"),
+                        payload=("bW9kZWwgTW9kZWw="),
+                        payload_type=("InlineBase64"),
                     )
                 ],
             ),
@@ -421,24 +362,10 @@ def test_get_semantic_model_definition(
     payload = response.json()
 
     assert payload["workspace_id"] == WORKSPACE_ID
-    assert (
-        payload["semantic_model_id"]
-        == SEMANTIC_MODEL_ID
-    )
-    assert (
-        payload["definition"]["format"]
-        == "TMSL"
-    )
-    assert (
-        payload["definition"]["parts"][0][
-            "payloadType"
-        ]
-        == "InlineBase64"
-    )
-    assert (
-        "payload_type"
-        not in payload["definition"]["parts"][0]
-    )
+    assert payload["semantic_model_id"] == SEMANTIC_MODEL_ID
+    assert payload["definition"]["format"] == "TMSL"
+    assert payload["definition"]["parts"][0]["payloadType"] == "InlineBase64"
+    assert "payload_type" not in payload["definition"]["parts"][0]
 
 
 def test_semantic_model_definition_rejects_invalid_format(
@@ -476,10 +403,7 @@ def test_get_semantic_model_xmla_metadata(
         return XmlaSemanticModelMetadataResponse(
             workspace_id=workspace_id,
             semantic_model_id=semantic_model_id,
-            xmla_endpoint=(
-                "powerbi://api.powerbi.com/v1.0/"
-                "myorg/Sales Workspace"
-            ),
+            xmla_endpoint=("powerbi://api.powerbi.com/v1.0/myorg/Sales Workspace"),
             database_name=database_name,
             table_count=1,
             column_count=0,
@@ -487,11 +411,7 @@ def test_get_semantic_model_xmla_metadata(
             relationship_count=0,
             hierarchy_count=0,
             partition_count=0,
-            tables=[
-                XmlaSemanticModelTable(
-                    name="Sales"
-                )
-            ],
+            tables=[XmlaSemanticModelTable(name="Sales")],
         )
 
     monkeypatch.setattr(
@@ -513,22 +433,15 @@ def test_get_semantic_model_xmla_metadata(
     payload = response.json()
 
     assert payload["workspace_id"] == WORKSPACE_ID
-    assert (
-        payload["semantic_model_id"]
-        == SEMANTIC_MODEL_ID
-    )
+    assert payload["semantic_model_id"] == SEMANTIC_MODEL_ID
     assert payload["source"] == "xmla"
     assert (
-        payload["xmla_endpoint"]
-        == "powerbi://api.powerbi.com/v1.0/"
+        payload["xmla_endpoint"] == "powerbi://api.powerbi.com/v1.0/"
         "myorg/Sales Workspace"
     )
     assert payload["database_name"] == "Sales Model"
     assert payload["table_count"] == 1
-    assert (
-        payload["tables"][0]["name"]
-        == "Sales"
-    )
+    assert payload["tables"][0]["name"] == "Sales"
 
 
 def test_get_semantic_model_metadata(
@@ -566,8 +479,7 @@ def test_get_semantic_model_metadata(
                 workspace_id=workspace_id,
                 semantic_model_id=semantic_model_id,
                 xmla_endpoint=(
-                    "powerbi://api.powerbi.com/v1.0/"
-                    "myorg/Sales%20Workspace"
+                    "powerbi://api.powerbi.com/v1.0/myorg/Sales%20Workspace"
                 ),
                 table_count=0,
                 column_count=0,
@@ -631,9 +543,7 @@ def test_get_report_semantic_lineage(
     client,
     monkeypatch,
 ):
-    expected_semantic_model_workspace_id = (
-        "a2f8996f-8f1a-46e3-8f7c-3f2d2145df45"
-    )
+    expected_semantic_model_workspace_id = "a2f8996f-8f1a-46e3-8f7c-3f2d2145df45"
 
     async def fake_build_lineage(
         self,
@@ -648,24 +558,16 @@ def test_get_report_semantic_lineage(
     ) -> ReportSemanticLineageResponse:
         assert workspace_id == WORKSPACE_ID
         assert report_id == REPORT_ID
-        assert (
-            semantic_model_workspace_id
-            == expected_semantic_model_workspace_id
-        )
+        assert semantic_model_workspace_id == expected_semantic_model_workspace_id
         assert semantic_model_id == SEMANTIC_MODEL_ID
         assert access_token == "fake-fabric-token"
         assert report_definition_format == "PBIR"
-        assert (
-            semantic_model_definition_format
-            == "TMDL"
-        )
+        assert semantic_model_definition_format == "TMDL"
 
         return ReportSemanticLineageResponse(
             workspace_id=workspace_id,
             report_id=report_id,
-            semantic_model_workspace_id=(
-                semantic_model_workspace_id
-            ),
+            semantic_model_workspace_id=(semantic_model_workspace_id),
             semantic_model_id=semantic_model_id,
             total_field_reference_count=1,
             matched_field_reference_count=1,
@@ -702,26 +604,14 @@ def test_get_report_semantic_lineage(
     assert payload["workspace_id"] == WORKSPACE_ID
     assert payload["report_id"] == REPORT_ID
     assert (
-        payload["semantic_model_workspace_id"]
-        == expected_semantic_model_workspace_id
+        payload["semantic_model_workspace_id"] == expected_semantic_model_workspace_id
     )
-    assert (
-        payload["semantic_model_id"]
-        == SEMANTIC_MODEL_ID
-    )
-    assert (
-        payload["matched_field_reference_count"]
-        == 1
-    )
-    assert (
-        payload["diagnostics_summary"][
-            "status_counts"
-        ]
-        == {
-            "matched": 1,
-            "unmatched": 0,
-        }
-    )
+    assert payload["semantic_model_id"] == SEMANTIC_MODEL_ID
+    assert payload["matched_field_reference_count"] == 1
+    assert payload["diagnostics_summary"]["status_counts"] == {
+        "matched": 1,
+        "unmatched": 0,
+    }
 
 
 def test_report_semantic_lineage_rejects_semantic_model_format_for_report(

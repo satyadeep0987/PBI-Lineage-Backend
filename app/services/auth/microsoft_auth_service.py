@@ -1,5 +1,3 @@
-
-
 # class MicrosoftAuthService:
 
 #     def prepare_powerbi_auth(

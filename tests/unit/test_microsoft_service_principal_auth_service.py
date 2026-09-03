@@ -59,9 +59,7 @@ async def test_authenticate_acquires_both_application_tokens_without_storing_sec
         assert session.powerbi_access_token == "powerbi-token"
         assert session.fabric_access_token == "fabric-token"
         assert not hasattr(session, "client_secret")
-        assert {call["client_credential"] for call in calls} == {
-            "secret-value"
-        }
+        assert {call["client_credential"] for call in calls} == {"secret-value"}
         assert {call["client_id"] for call in calls} == {"client-id"}
     finally:
         delete_device_session(result.session_id)

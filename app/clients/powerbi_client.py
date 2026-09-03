@@ -19,14 +19,10 @@ class PowerBIClient:
         try:
             payload = response.json()
         except ValueError as exc:
-            raise UpstreamInvalidResponseError(
-                "powerbi"
-            ) from exc
+            raise UpstreamInvalidResponseError("powerbi") from exc
 
         if not isinstance(payload, dict):
-            raise UpstreamInvalidResponseError(
-                "powerbi"
-            )
+            raise UpstreamInvalidResponseError("powerbi")
 
         return payload
 
@@ -34,24 +30,15 @@ class PowerBIClient:
     def _parse_list_response(
         response: httpx.Response,
     ) -> list[dict[str, Any]]:
-        payload = PowerBIClient._parse_object_response(
-            response
-        )
+        payload = PowerBIClient._parse_object_response(response)
 
         items = payload.get("value")
 
         if not isinstance(items, list):
-            raise UpstreamInvalidResponseError(
-                "powerbi"
-            )
+            raise UpstreamInvalidResponseError("powerbi")
 
-        if not all(
-            isinstance(item, dict)
-            for item in items
-        ):
-            raise UpstreamInvalidResponseError(
-                "powerbi"
-            )
+        if not all(isinstance(item, dict) for item in items):
+            raise UpstreamInvalidResponseError("powerbi")
 
         return items
 
@@ -62,16 +49,12 @@ class PowerBIClient:
         try:
             payload = response.json()
         except ValueError as exc:
-            raise UpstreamInvalidResponseError(
-                "powerbi"
-            ) from exc
+            raise UpstreamInvalidResponseError("powerbi") from exc
 
         if not isinstance(payload, list) or not all(
             isinstance(item, dict) for item in payload
         ):
-            raise UpstreamInvalidResponseError(
-                "powerbi"
-            )
+            raise UpstreamInvalidResponseError("powerbi")
         return payload
 
     async def validate_connection(
@@ -106,9 +89,7 @@ class PowerBIClient:
             },
         )
 
-        return self._parse_list_response(
-            response
-        )
+        return self._parse_list_response(response)
 
     async def get_workspace(
         self,
@@ -118,16 +99,11 @@ class PowerBIClient:
     ) -> dict[str, Any]:
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/groups/"
-                f"{workspace_id}"
-            ),
+            url=(f"{self.BASE_URL}/groups/{workspace_id}"),
             access_token=access_token,
         )
 
-        return self._parse_object_response(
-            response
-        )
+        return self._parse_object_response(response)
 
     async def get_reports_in_workspace(
         self,
@@ -137,16 +113,11 @@ class PowerBIClient:
     ) -> list[dict[str, Any]]:
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/groups/"
-                f"{workspace_id}/reports"
-            ),
+            url=(f"{self.BASE_URL}/groups/{workspace_id}/reports"),
             access_token=access_token,
         )
 
-        return self._parse_list_response(
-            response
-        )
+        return self._parse_list_response(response)
 
     async def get_semantic_models_in_workspace(
         self,
@@ -156,16 +127,11 @@ class PowerBIClient:
     ) -> list[dict[str, Any]]:
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/groups/"
-                f"{workspace_id}/datasets"
-            ),
+            url=(f"{self.BASE_URL}/groups/{workspace_id}/datasets"),
             access_token=access_token,
         )
 
-        return self._parse_list_response(
-            response
-        )
+        return self._parse_list_response(response)
 
     async def get_report(
         self,
@@ -176,16 +142,11 @@ class PowerBIClient:
     ) -> dict[str, Any]:
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/groups/"
-                f"{workspace_id}/reports/{report_id}"
-            ),
+            url=(f"{self.BASE_URL}/groups/{workspace_id}/reports/{report_id}"),
             access_token=access_token,
         )
 
-        return self._parse_object_response(
-            response
-        )
+        return self._parse_object_response(response)
 
     async def get_report_in_my_workspace(
         self,
@@ -195,16 +156,12 @@ class PowerBIClient:
     ) -> dict[str, Any]:
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/reports/{report_id}"
-            ),
+            url=(f"{self.BASE_URL}/reports/{report_id}"),
             access_token=access_token,
             not_found_resource="report",
         )
 
-        return self._parse_object_response(
-            response
-        )
+        return self._parse_object_response(response)
 
     async def get_gateways(
         self,
@@ -217,9 +174,7 @@ class PowerBIClient:
             access_token=access_token,
         )
 
-        return self._parse_list_response(
-            response
-        )
+        return self._parse_list_response(response)
 
     async def get_gateway_datasource(
         self,
@@ -230,17 +185,12 @@ class PowerBIClient:
     ) -> dict[str, Any]:
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/gateways/{gateway_id}/"
-                f"datasources/{datasource_id}"
-            ),
+            url=(f"{self.BASE_URL}/gateways/{gateway_id}/datasources/{datasource_id}"),
             access_token=access_token,
             not_found_resource="gateway datasource",
         )
 
-        return self._parse_object_response(
-            response
-        )
+        return self._parse_object_response(response)
 
     async def get_gateway_datasources(
         self,
@@ -273,9 +223,7 @@ class PowerBIClient:
 
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/admin/workspaces/modified"
-            ),
+            url=(f"{self.BASE_URL}/admin/workspaces/modified"),
             access_token=access_token,
             params=params,
         )
@@ -294,9 +242,7 @@ class PowerBIClient:
     ) -> dict[str, Any]:
         response = await provider_post(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/admin/workspaces/getInfo"
-            ),
+            url=(f"{self.BASE_URL}/admin/workspaces/getInfo"),
             access_token=access_token,
             params={
                 "lineage": lineage,
@@ -317,10 +263,7 @@ class PowerBIClient:
     ) -> dict[str, Any]:
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/admin/workspaces/"
-                f"scanStatus/{scan_id}"
-            ),
+            url=(f"{self.BASE_URL}/admin/workspaces/scanStatus/{scan_id}"),
             access_token=access_token,
             not_found_resource="scanner scan",
         )
@@ -334,15 +277,11 @@ class PowerBIClient:
     ) -> dict[str, Any]:
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/admin/workspaces/"
-                f"scanResult/{scan_id}"
-            ),
+            url=(f"{self.BASE_URL}/admin/workspaces/scanResult/{scan_id}"),
             access_token=access_token,
             not_found_resource="scanner scan",
         )
         return self._parse_object_response(response)
-
 
     async def get_report_pages(
         self,
@@ -353,18 +292,11 @@ class PowerBIClient:
     ) -> list[dict[str, Any]]:
         response = await provider_get(
             provider="powerbi",
-            url=(
-                f"{self.BASE_URL}/groups/"
-                f"{workspace_id}/reports/"
-                f"{report_id}/pages"
-            ),
+            url=(f"{self.BASE_URL}/groups/{workspace_id}/reports/{report_id}/pages"),
             access_token=access_token,
         )
 
-        return self._parse_list_response(
-            response
-        )
-
+        return self._parse_list_response(response)
 
     async def get_report_page(
         self,
@@ -385,6 +317,4 @@ class PowerBIClient:
             access_token=access_token,
         )
 
-        return self._parse_object_response(
-            response
-        )
+        return self._parse_object_response(response)

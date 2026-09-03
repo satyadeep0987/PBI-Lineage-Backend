@@ -9,9 +9,7 @@ from starlette.types import (
     Send,
 )
 
-logger = logging.getLogger(
-    "app.http"
-)
+logger = logging.getLogger("app.http")
 
 
 class RequestLoggingMiddleware:
@@ -45,9 +43,7 @@ class RequestLoggingMiddleware:
             nonlocal status_code
 
             if message["type"] == "http.response.start":
-                status_code = message[
-                    "status"
-                ]
+                status_code = message["status"]
 
             await send(message)
 
@@ -59,11 +55,7 @@ class RequestLoggingMiddleware:
             )
         finally:
             duration_ms = round(
-                (
-                    perf_counter()
-                    - start_time
-                )
-                * 1000,
+                (perf_counter() - start_time) * 1000,
                 2,
             )
 
@@ -78,9 +70,7 @@ class RequestLoggingMiddleware:
             logger.info(
                 "request_completed",
                 extra={
-                    "event": (
-                        "request_completed"
-                    ),
+                    "event": ("request_completed"),
                     "request_id": request_id,
                     "method": scope.get(
                         "method",
@@ -92,11 +82,7 @@ class RequestLoggingMiddleware:
                         "path",
                         "",
                     ),
-                    "status_code": (
-                        status_code
-                    ),
-                    "duration_ms": (
-                        duration_ms
-                    ),
+                    "status_code": (status_code),
+                    "duration_ms": (duration_ms),
                 },
             )

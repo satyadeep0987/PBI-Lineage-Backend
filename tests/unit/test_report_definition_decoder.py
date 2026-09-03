@@ -18,84 +18,51 @@ from app.services.report_definition_decoder import (
 def _encode(
     value: object,
 ) -> str:
-    payload = json.dumps(
-        value
-    ).encode(
-        "utf-8"
-    )
+    payload = json.dumps(value).encode("utf-8")
 
-    return base64.b64encode(
-        payload
-    ).decode(
-        "ascii"
-    )
+    return base64.b64encode(payload).decode("ascii")
 
 
 def test_decode_definition_pbir():
-    decoder = (
-        ReportDefinitionDecoder()
-    )
+    decoder = ReportDefinitionDecoder()
 
     definition = ReportDefinition(
         format="PBIR",
         parts=[
             ReportDefinitionPart(
                 path="definition.pbir",
-                payload=_encode(
-                    {
-                        "version": "4.0"
-                    }
-                ),
+                payload=_encode({"version": "4.0"}),
                 payload_type="InlineBase64",
             )
         ],
     )
 
-    result = decoder.decode(
-        definition
-    )
+    result = decoder.decode(definition)
 
-    assert (
-        result[
-            "definition.pbir"
-        ]["version"]
-        == "4.0"
-    )
+    assert result["definition.pbir"]["version"] == "4.0"
 
 
 def test_static_resource_is_ignored():
-    decoder = (
-        ReportDefinitionDecoder()
-    )
+    decoder = ReportDefinitionDecoder()
 
     definition = ReportDefinition(
         format="PBIR",
         parts=[
             ReportDefinitionPart(
-                path=(
-                    "StaticResources/"
-                    "RegisteredResources/"
-                    "logo.png"
-                ),
+                path=("StaticResources/RegisteredResources/logo.png"),
                 payload="not-base64",
-                payload_type=(
-                    "InlineBase64"
-                ),
+                payload_type=("InlineBase64"),
             )
         ],
     )
 
-    result = decoder.decode(
-        definition
-    )
+    result = decoder.decode(definition)
 
     assert result == {}
 
 
 def test_invalid_base64_raises():
-    decoder = (
-        ReportDefinitionDecoder()
-    )
+    decoder = ReportDefinitionDecoder()
 
     definition = ReportDefinition(
         format="PBIR",
@@ -108,9 +75,5 @@ def test_invalid_base64_raises():
         ],
     )
 
-    with pytest.raises(
-        UpstreamInvalidResponseError
-    ):
-        decoder.decode(
-            definition
-        )
+    with pytest.raises(UpstreamInvalidResponseError):
+        decoder.decode(definition)

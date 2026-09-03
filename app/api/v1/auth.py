@@ -39,27 +39,19 @@ from app.services.auth.microsoft_service_principal_auth_service import (
 
 router = APIRouter()
 
+
 def _build_scope_access(
     *,
     requested_scopes: list[str],
     granted_scopes: list[str],
 ) -> list[ProviderScopeAccess]:
-    granted_permissions = set(
-        normalize_scope_permissions(
-            granted_scopes
-        )
-    )
+    granted_permissions = set(normalize_scope_permissions(granted_scopes))
 
     return [
         ProviderScopeAccess(
             scope=scope,
-            permission=get_scope_permission(
-                scope
-            ),
-            granted=(
-                get_scope_permission(scope)
-                in granted_permissions
-            ),
+            permission=get_scope_permission(scope),
+            granted=(get_scope_permission(scope) in granted_permissions),
         )
         for scope in requested_scopes
     ]
@@ -79,17 +71,9 @@ def _build_provider_test_result(
         granted_scopes=granted_scopes,
     )
 
-    missing_scopes = [
-        item.scope
-        for item in scope_access
-        if not item.granted
-    ]
+    missing_scopes = [item.scope for item in scope_access if not item.granted]
 
-    message = (
-        success_message
-        if connected
-        else failure_message
-    )
+    message = success_message if connected else failure_message
 
     if not connected and error_code:
         message = f"{message}: {error_code}"
@@ -99,9 +83,7 @@ def _build_provider_test_result(
         message=message,
         error_code=error_code,
         requested_scopes=requested_scopes,
-        granted_scopes=normalize_scope_permissions(
-            granted_scopes
-        ),
+        granted_scopes=normalize_scope_permissions(granted_scopes),
         missing_scopes=missing_scopes,
         scope_access=scope_access,
     )
@@ -115,29 +97,19 @@ def _build_device_status_response(
             status="pending",
             powerbi=_build_provider_test_result(
                 connected=False,
-                success_message=(
-                    "Power BI connection successful."
-                ),
-                failure_message=(
-                    "Power BI authentication is pending."
-                ),
+                success_message=("Power BI connection successful."),
+                failure_message=("Power BI authentication is pending."),
                 requested_scopes=POWERBI_SCOPES,
                 granted_scopes=[],
             ),
             fabric=_build_provider_test_result(
                 connected=False,
-                success_message=(
-                    "Fabric connection successful."
-                ),
-                failure_message=(
-                    "Fabric authentication is pending."
-                ),
+                success_message=("Fabric connection successful."),
+                failure_message=("Fabric authentication is pending."),
                 requested_scopes=FABRIC_SCOPES,
                 granted_scopes=[],
             ),
-            message=(
-                "Waiting for Microsoft authentication."
-            ),
+            message=("Waiting for Microsoft authentication."),
         )
 
     if session.status == "failed":
@@ -145,35 +117,19 @@ def _build_device_status_response(
             status="failed",
             powerbi=_build_provider_test_result(
                 connected=False,
-                success_message=(
-                    "Power BI connection successful."
-                ),
-                failure_message=(
-                    "Power BI connection failed."
-                ),
+                success_message=("Power BI connection successful."),
+                failure_message=("Power BI connection failed."),
                 requested_scopes=POWERBI_SCOPES,
-                granted_scopes=(
-                    session.powerbi_granted_scopes
-                ),
-                error_code=(
-                    session.powerbi_error_code
-                ),
+                granted_scopes=(session.powerbi_granted_scopes),
+                error_code=(session.powerbi_error_code),
             ),
             fabric=_build_provider_test_result(
                 connected=False,
-                success_message=(
-                    "Fabric connection successful."
-                ),
-                failure_message=(
-                    "Fabric authentication is not available."
-                ),
+                success_message=("Fabric connection successful."),
+                failure_message=("Fabric authentication is not available."),
                 requested_scopes=FABRIC_SCOPES,
-                granted_scopes=(
-                    session.fabric_granted_scopes
-                ),
-                error_code=(
-                    session.fabric_error_code
-                ),
+                granted_scopes=(session.fabric_granted_scopes),
+                error_code=(session.fabric_error_code),
             ),
             message=session.error_message,
         )
@@ -181,35 +137,19 @@ def _build_device_status_response(
     return MicrosoftDeviceAuthStatusResponse(
         status="authenticated",
         powerbi=_build_provider_test_result(
-            connected=bool(
-                session.powerbi_connected
-            ),
-            success_message=(
-                "Power BI connection successful."
-            ),
-            failure_message=(
-                "Power BI connection failed."
-            ),
+            connected=bool(session.powerbi_connected),
+            success_message=("Power BI connection successful."),
+            failure_message=("Power BI connection failed."),
             requested_scopes=POWERBI_SCOPES,
-            granted_scopes=(
-                session.powerbi_granted_scopes
-            ),
+            granted_scopes=(session.powerbi_granted_scopes),
             error_code=session.powerbi_error_code,
         ),
         fabric=_build_provider_test_result(
-            connected=bool(
-                session.fabric_connected
-            ),
-            success_message=(
-                "Fabric connection successful."
-            ),
-            failure_message=(
-                "Fabric authentication is not available."
-            ),
+            connected=bool(session.fabric_connected),
+            success_message=("Fabric connection successful."),
+            failure_message=("Fabric authentication is not available."),
             requested_scopes=FABRIC_SCOPES,
-            granted_scopes=(
-                session.fabric_granted_scopes
-            ),
+            granted_scopes=(session.fabric_granted_scopes),
             error_code=session.fabric_error_code,
         ),
         message=None,
@@ -223,28 +163,20 @@ def _build_device_status_response(
 async def get_microsoft_device_authentication_status(
     session_id: str,
 ) -> MicrosoftDeviceAuthStatusResponse:
-    session = get_device_session(
-        session_id
-    )
+    session = get_device_session(session_id)
 
     if session is None:
         return MicrosoftDeviceAuthStatusResponse(
             status="expired",
-            message=(
-                "Authentication session "
-                "does not exist or has expired."
-            ),
+            message=("Authentication session does not exist or has expired."),
         )
 
-    return _build_device_status_response(
-        session
-    )
+    return _build_device_status_response(session)
+
 
 @router.post(
     "/microsoft/device/start",
-    response_model=(
-        MicrosoftDeviceAuthStartResponse
-    ),
+    response_model=(MicrosoftDeviceAuthStartResponse),
 )
 async def start_microsoft_device_authentication(
     request: MicrosoftDeviceAuthRequest,
@@ -261,9 +193,7 @@ async def start_microsoft_device_authentication(
     response.set_cookie(
         key=AUTH_SESSION_COOKIE,
         value=session_id,
-        max_age=(
-            AUTH_SESSION_MAX_AGE_SECONDS
-        ),
+        max_age=(AUTH_SESSION_MAX_AGE_SECONDS),
         httponly=True,
         secure=settings.auth_cookie_secure,
         samesite=settings.auth_cookie_samesite,
@@ -272,15 +202,9 @@ async def start_microsoft_device_authentication(
 
     return MicrosoftDeviceAuthStartResponse(
         session_id=session_id,
-        verification_uri=flow[
-            "verification_uri"
-        ],
-        user_code=flow[
-            "user_code"
-        ],
-        message=flow[
-            "message"
-        ],
+        verification_uri=flow["verification_uri"],
+        user_code=flow["user_code"],
+        message=flow["message"],
         expires_in=int(
             flow.get(
                 "expires_in",
@@ -304,26 +228,19 @@ async def get_microsoft_device_auth_status(
     if session_id is None:
         raise AuthenticationSessionRequiredError()
 
-    session = get_device_session(
-        session_id
-    )
+    session = get_device_session(session_id)
 
     if session is None:
         raise AuthenticationSessionExpiredError()
 
     if session.status == "pending":
-        return _build_device_status_response(
-            session
-        )
+        return _build_device_status_response(session)
 
     if session.status == "failed":
-        return _build_device_status_response(
-            session
-        )
+        return _build_device_status_response(session)
 
-    return _build_device_status_response(
-        session
-    )
+    return _build_device_status_response(session)
+
 
 @router.post(
     "/microsoft/device/logout",
@@ -338,9 +255,7 @@ async def logout_microsoft_device_session(
     settings = get_settings()
 
     if session_id:
-        delete_device_session(
-            session_id
-        )
+        delete_device_session(session_id)
 
     response.delete_cookie(
         key=AUTH_SESSION_COOKIE,
@@ -349,9 +264,7 @@ async def logout_microsoft_device_session(
         samesite=settings.auth_cookie_samesite,
     )
 
-    return {
-        "status": "logged_out"
-    }
+    return {"status": "logged_out"}
 
 
 @router.post(

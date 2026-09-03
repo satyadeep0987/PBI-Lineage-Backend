@@ -148,7 +148,9 @@ class PhysicalSourceDiscoveryService:
 
                 for native_query in candidates:
                     sql_objects = _sql_objects(native_query) if native_query else []
-                    object_candidates = sql_objects or ([navigation] if navigation else [None])
+                    object_candidates = sql_objects or (
+                        [navigation] if navigation else [None]
+                    )
 
                     for object_target in object_candidates:
                         schema_name = object_target[0] if object_target else None

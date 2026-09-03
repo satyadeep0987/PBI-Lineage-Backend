@@ -25,9 +25,7 @@ class MicrosoftAuthPreparationResponse(BaseModel):
     authority: str
     scopes: list[str]
 
-    authentication_flow: str = (
-        "authorization_code_pkce"
-    )
+    authentication_flow: str = "authorization_code_pkce"
 
 
 class PowerBIAuthContext(BaseModel):
@@ -88,21 +86,14 @@ class ProviderTestResult(BaseModel):
 
     error_code: str | None = None
 
-    requested_scopes: list[str] = Field(
-        default_factory=list
-    )
+    requested_scopes: list[str] = Field(default_factory=list)
 
-    granted_scopes: list[str] = Field(
-        default_factory=list
-    )
+    granted_scopes: list[str] = Field(default_factory=list)
 
-    missing_scopes: list[str] = Field(
-        default_factory=list
-    )
+    missing_scopes: list[str] = Field(default_factory=list)
 
-    scope_access: list[ProviderScopeAccess] = Field(
-        default_factory=list
-    )
+    scope_access: list[ProviderScopeAccess] = Field(default_factory=list)
+
 
 class MicrosoftDeviceAuthStatusResponse(BaseModel):
     status: Literal[
@@ -138,9 +129,7 @@ class MicrosoftApplicationTokenResult(BaseModel):
     token_acquired: bool
     resource: str
     requested_scope: str
-    granted_roles: list[str] = Field(
-        default_factory=list
-    )
+    granted_roles: list[str] = Field(default_factory=list)
     error_code: str | None = None
     message: str
 
@@ -151,9 +140,7 @@ class MicrosoftServicePrincipalAuthResponse(BaseModel):
         "authenticated",
         "partial",
     ]
-    authentication_method: Literal[
-        "client_secret"
-    ] = "client_secret"
+    authentication_method: Literal["client_secret"] = "client_secret"
     powerbi: MicrosoftApplicationTokenResult
     fabric: MicrosoftApplicationTokenResult
     message: str | None = None

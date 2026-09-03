@@ -13,46 +13,29 @@ from app.core.exceptions import (
     UpstreamRequestError,
 )
 
-TMSCHEMA_TABLES_QUERY = (
-    "SELECT * FROM $SYSTEM.TMSCHEMA_TABLES"
-)
-TMSCHEMA_COLUMNS_QUERY = (
-    "SELECT * FROM $SYSTEM.TMSCHEMA_COLUMNS"
-)
-TMSCHEMA_MEASURES_QUERY = (
-    "SELECT * FROM $SYSTEM.TMSCHEMA_MEASURES"
-)
-TMSCHEMA_PARTITIONS_QUERY = (
-    "SELECT * FROM $SYSTEM.TMSCHEMA_PARTITIONS"
-)
-TMSCHEMA_HIERARCHIES_QUERY = (
-    "SELECT * FROM $SYSTEM.TMSCHEMA_HIERARCHIES"
-)
-TMSCHEMA_LEVELS_QUERY = (
-    "SELECT * FROM $SYSTEM.TMSCHEMA_LEVELS"
-)
-TMSCHEMA_RELATIONSHIPS_QUERY = (
-    "SELECT * FROM $SYSTEM.TMSCHEMA_RELATIONSHIPS"
-)
+TMSCHEMA_TABLES_QUERY = "SELECT * FROM $SYSTEM.TMSCHEMA_TABLES"
+TMSCHEMA_COLUMNS_QUERY = "SELECT * FROM $SYSTEM.TMSCHEMA_COLUMNS"
+TMSCHEMA_MEASURES_QUERY = "SELECT * FROM $SYSTEM.TMSCHEMA_MEASURES"
+TMSCHEMA_PARTITIONS_QUERY = "SELECT * FROM $SYSTEM.TMSCHEMA_PARTITIONS"
+TMSCHEMA_HIERARCHIES_QUERY = "SELECT * FROM $SYSTEM.TMSCHEMA_HIERARCHIES"
+TMSCHEMA_LEVELS_QUERY = "SELECT * FROM $SYSTEM.TMSCHEMA_LEVELS"
+TMSCHEMA_RELATIONSHIPS_QUERY = "SELECT * FROM $SYSTEM.TMSCHEMA_RELATIONSHIPS"
 
 
 class XmlaMetadataConnection(Protocol):
-    def __enter__(self) -> Self:
-        ...
+    def __enter__(self) -> Self: ...
 
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         traceback: TracebackType | None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def execute(
         self,
         query: str,
-    ) -> list[dict[str, Any]]:
-        ...
+    ) -> list[dict[str, Any]]: ...
 
 
 class XmlaConnectionFactory(Protocol):
@@ -60,8 +43,7 @@ class XmlaConnectionFactory(Protocol):
         self,
         *,
         connection_string: str,
-    ) -> XmlaMetadataConnection:
-        ...
+    ) -> XmlaMetadataConnection: ...
 
 
 class AdoComXmlaConnection:
@@ -70,9 +52,7 @@ class AdoComXmlaConnection:
         *,
         connection_string: str,
     ) -> None:
-        self.connection_string = (
-            connection_string
-        )
+        self.connection_string = connection_string
         self._connection: Any = None
         self._pythoncom: Any = None
         self._com_initialized = False
@@ -91,10 +71,7 @@ class AdoComXmlaConnection:
             )
 
             if platform.system() != "Windows":
-                detail = (
-                    f"{detail} This host is not "
-                    "Windows."
-                )
+                detail = f"{detail} This host is not Windows."
 
             raise ProviderIntegrationNotConfiguredError(
                 "xmla",
@@ -106,21 +83,13 @@ class AdoComXmlaConnection:
         try:
             pythoncom.CoInitialize()
             self._com_initialized = True
-            self._connection = (
-                win32com.client.Dispatch(
-                    "ADODB.Connection"
-                )
-            )
-            self._connection.Open(
-                self.connection_string
-            )
+            self._connection = win32com.client.Dispatch("ADODB.Connection")
+            self._connection.Open(self.connection_string)
 
         except Exception as exc:
             self.__exit__(None, None, None)
 
-            if _is_provider_configuration_error(
-                exc
-            ):
+            if _is_provider_configuration_error(exc):
                 raise ProviderIntegrationNotConfiguredError(
                     "xmla",
                     detail=(
@@ -156,10 +125,7 @@ class AdoComXmlaConnection:
                 with suppress(Exception):
                     close()
 
-        if (
-            self._com_initialized
-            and self._pythoncom is not None
-        ):
+        if self._com_initialized and self._pythoncom is not None:
             with suppress(Exception):
                 self._pythoncom.CoUninitialize()
 
@@ -174,28 +140,18 @@ class AdoComXmlaConnection:
         if self._connection is None:
             raise UpstreamRequestError(
                 "xmla",
-                detail=(
-                    "XMLA connection is not open."
-                ),
+                detail=("XMLA connection is not open."),
             )
 
-        result = self._connection.Execute(
-            query
-        )
+        result = self._connection.Execute(query)
 
-        recordset = (
-            result[0]
-            if isinstance(result, tuple)
-            else result
-        )
+        recordset = result[0] if isinstance(result, tuple) else result
 
         if recordset is None:
             return []
 
         try:
-            return _recordset_to_rows(
-                recordset
-            )
+            return _recordset_to_rows(recordset)
 
         finally:
             close_recordset = getattr(
@@ -214,20 +170,14 @@ def _recordset_to_rows(
 ) -> list[dict[str, Any]]:
     fields = recordset.Fields
     field_count = int(fields.Count)
-    columns = [
-        str(fields.Item(index).Name)
-        for index in range(field_count)
-    ]
+    columns = [str(fields.Item(index).Name) for index in range(field_count)]
     rows: list[dict[str, Any]] = []
 
     while not bool(recordset.EOF):
         rows.append(
             {
-                column: _normalize_ado_value(
-                    fields.Item(index).Value
-                )
-                for index, column
-                in enumerate(columns)
+                column: _normalize_ado_value(fields.Item(index).Value)
+                for index, column in enumerate(columns)
             }
         )
         recordset.MoveNext()
@@ -236,34 +186,20 @@ def _recordset_to_rows(
 
 
 class XmlaClient:
-    BASE_ENDPOINT = (
-        "powerbi://api.powerbi.com/v1.0"
-    )
+    BASE_ENDPOINT = "powerbi://api.powerbi.com/v1.0"
 
     def __init__(
         self,
         *,
-        connection_factory: (
-            XmlaConnectionFactory | None
-        ) = None,
+        connection_factory: (XmlaConnectionFactory | None) = None,
         tenant_name: str | None = None,
         provider_name: str | None = None,
     ) -> None:
         settings = get_settings()
 
-        self.connection_factory = (
-            connection_factory
-            or AdoComXmlaConnection
-        )
-        self.tenant_name = (
-            tenant_name
-            or settings.xmla_tenant_name
-        )
-        self.provider_name = (
-            provider_name
-            or settings.xmla_provider
-            or "MSOLAP"
-        )
+        self.connection_factory = connection_factory or AdoComXmlaConnection
+        self.tenant_name = tenant_name or settings.xmla_tenant_name
+        self.provider_name = provider_name or settings.xmla_provider or "MSOLAP"
 
     def build_workspace_endpoint(
         self,
@@ -280,11 +216,7 @@ class XmlaClient:
             safe="",
         )
 
-        return (
-            f"{self.BASE_ENDPOINT}/"
-            f"{tenant}/"
-            f"{workspace_target}"
-        )
+        return f"{self.BASE_ENDPOINT}/{tenant}/{workspace_target}"
 
     def build_connection_string(
         self,
@@ -295,9 +227,7 @@ class XmlaClient:
         database_name: str | None = None,
         access_token: str | None = None,
     ) -> str:
-        initial_catalog = (
-            database_name or semantic_model_id
-        )
+        initial_catalog = database_name or semantic_model_id
         endpoint = self.build_workspace_endpoint(
             workspace_id=workspace_id,
             workspace_name=workspace_name,
@@ -326,11 +256,7 @@ class XmlaClient:
             )
 
         return "".join(
-            (
-                f"{key}="
-                f"{_connection_string_value(value)};"
-            )
-            for key, value in parts
+            (f"{key}={_connection_string_value(value)};") for key, value in parts
         )
 
     async def get_semantic_model_metadata(
@@ -375,16 +301,12 @@ class XmlaClient:
         workspace_name: str | None,
         database_name: str | None,
     ) -> dict[str, Any]:
-        connection_string = (
-            self.build_connection_string(
-                workspace_id=workspace_id,
-                semantic_model_id=(
-                    semantic_model_id
-                ),
-                workspace_name=workspace_name,
-                database_name=database_name,
-                access_token=access_token,
-            )
+        connection_string = self.build_connection_string(
+            workspace_id=workspace_id,
+            semantic_model_id=(semantic_model_id),
+            workspace_name=workspace_name,
+            database_name=database_name,
+            access_token=access_token,
         )
 
         rowsets: dict[
@@ -396,9 +318,7 @@ class XmlaClient:
             connection_string=connection_string,
         ) as connection:
             for name, query in _ROWSET_QUERIES.items():
-                rowsets[name] = connection.execute(
-                    query
-                )
+                rowsets[name] = connection.execute(query)
 
         return _metadata_from_rowsets(
             rowsets,
@@ -439,9 +359,7 @@ def _metadata_from_rowsets(
         str,
         dict[str, Any],
     ] = {}
-    pending_sort_columns: list[
-        tuple[dict[str, Any], str]
-    ] = []
+    pending_sort_columns: list[tuple[dict[str, Any], str]] = []
 
     for table_row in rowsets.get(
         "tables",
@@ -461,10 +379,7 @@ def _metadata_from_rowsets(
             _add_warning(
                 warnings,
                 code="XMLA_TABLE_SKIPPED",
-                message=(
-                    "A table row did not include "
-                    "a name."
-                ),
+                message=("A table row did not include a name."),
                 object_name=table_id,
             )
             continue
@@ -488,9 +403,7 @@ def _metadata_from_rowsets(
         tables.append(table_payload)
 
         if table_id:
-            tables_by_id[table_id] = (
-                table_payload
-            )
+            tables_by_id[table_id] = table_payload
 
     for column_row in rowsets.get(
         "columns",
@@ -511,27 +424,21 @@ def _metadata_from_rowsets(
             "ID",
             "ColumnID",
         )
-        column_name = (
-            _text(
-                column_row,
-                "ExplicitName",
-                "InferredName",
-                "Name",
-            )
-            or _text(
-                column_row,
-                "SourceColumn",
-            )
+        column_name = _text(
+            column_row,
+            "ExplicitName",
+            "InferredName",
+            "Name",
+        ) or _text(
+            column_row,
+            "SourceColumn",
         )
 
         if not column_name:
             _add_warning(
                 warnings,
                 code="XMLA_COLUMN_SKIPPED",
-                message=(
-                    "A column row did not include "
-                    "a name."
-                ),
+                message=("A column row did not include a name."),
                 object_name=column_id,
             )
             continue
@@ -578,14 +485,10 @@ def _metadata_from_rowsets(
             ),
         }
 
-        table["columns"].append(
-            column_payload
-        )
+        table["columns"].append(column_payload)
 
         if column_id:
-            columns_by_id[column_id] = (
-                column_payload
-            )
+            columns_by_id[column_id] = column_payload
 
         sort_by_column_id = _identifier(
             column_row,
@@ -601,17 +504,11 @@ def _metadata_from_rowsets(
                 )
             )
 
-    for column_payload, sort_by_column_id in (
-        pending_sort_columns
-    ):
-        sort_column = columns_by_id.get(
-            sort_by_column_id
-        )
+    for column_payload, sort_by_column_id in pending_sort_columns:
+        sort_column = columns_by_id.get(sort_by_column_id)
 
         if sort_column:
-            column_payload["sort_by_column"] = (
-                sort_column["name"]
-            )
+            column_payload["sort_by_column"] = sort_column["name"]
 
     for measure_row in rowsets.get(
         "measures",
@@ -636,10 +533,7 @@ def _metadata_from_rowsets(
             _add_warning(
                 warnings,
                 code="XMLA_MEASURE_SKIPPED",
-                message=(
-                    "A measure row did not include "
-                    "a name."
-                ),
+                message=("A measure row did not include a name."),
             )
             continue
 
@@ -692,10 +586,7 @@ def _metadata_from_rowsets(
             _add_warning(
                 warnings,
                 code="XMLA_PARTITION_SKIPPED",
-                message=(
-                    "A partition row did not include "
-                    "a name."
-                ),
+                message=("A partition row did not include a name."),
             )
             continue
 
@@ -749,10 +640,7 @@ def _metadata_from_rowsets(
             _add_warning(
                 warnings,
                 code="XMLA_HIERARCHY_SKIPPED",
-                message=(
-                    "A hierarchy row did not include "
-                    "a name."
-                ),
+                message=("A hierarchy row did not include a name."),
                 object_name=hierarchy_id,
             )
             continue
@@ -765,14 +653,10 @@ def _metadata_from_rowsets(
             ),
             "levels": [],
         }
-        table["hierarchies"].append(
-            hierarchy_payload
-        )
+        table["hierarchies"].append(hierarchy_payload)
 
         if hierarchy_id:
-            hierarchies_by_id[
-                hierarchy_id
-            ] = hierarchy_payload
+            hierarchies_by_id[hierarchy_id] = hierarchy_payload
 
     for level_row in rowsets.get(
         "levels",
@@ -783,22 +667,13 @@ def _metadata_from_rowsets(
             "HierarchyID",
             "HierarchyId",
         )
-        hierarchy = (
-            hierarchies_by_id.get(
-                hierarchy_id
-            )
-            if hierarchy_id
-            else None
-        )
+        hierarchy = hierarchies_by_id.get(hierarchy_id) if hierarchy_id else None
 
         if hierarchy is None:
             _add_warning(
                 warnings,
                 code="XMLA_LEVEL_SKIPPED",
-                message=(
-                    "A hierarchy level row did not "
-                    "reference a known hierarchy."
-                ),
+                message=("A hierarchy level row did not reference a known hierarchy."),
                 object_name=hierarchy_id,
             )
             continue
@@ -808,11 +683,7 @@ def _metadata_from_rowsets(
             "ColumnID",
             "ColumnId",
         )
-        column = (
-            columns_by_id.get(column_id)
-            if column_id
-            else None
-        )
+        column = columns_by_id.get(column_id) if column_id else None
         level_name = _text(
             level_row,
             "Name",
@@ -822,10 +693,7 @@ def _metadata_from_rowsets(
             _add_warning(
                 warnings,
                 code="XMLA_LEVEL_SKIPPED",
-                message=(
-                    "A hierarchy level row did not "
-                    "include a name."
-                ),
+                message=("A hierarchy level row did not include a name."),
                 object_name=hierarchy_id,
             )
             continue
@@ -961,32 +829,18 @@ def _table_for_row(
     if not table_id:
         _add_warning(
             warnings,
-            code=(
-                f"XMLA_{object_type.upper()}"
-                "_SKIPPED"
-            ),
-            message=(
-                f"A {object_type} row did not "
-                "include a table reference."
-            ),
+            code=(f"XMLA_{object_type.upper()}_SKIPPED"),
+            message=(f"A {object_type} row did not include a table reference."),
         )
         return None
 
-    table = tables_by_id.get(
-        table_id
-    )
+    table = tables_by_id.get(table_id)
 
     if table is None:
         _add_warning(
             warnings,
-            code=(
-                f"XMLA_{object_type.upper()}"
-                "_SKIPPED"
-            ),
-            message=(
-                f"A {object_type} row referenced "
-                "an unknown table."
-            ),
+            code=(f"XMLA_{object_type.upper()}_SKIPPED"),
+            message=(f"A {object_type} row referenced an unknown table."),
             object_name=table_id,
         )
         return None
@@ -998,16 +852,10 @@ def _row_value(
     row: Mapping[str, Any],
     *keys: str,
 ) -> Any:
-    normalized_keys = {
-        _normalize_key(key)
-        for key in keys
-    }
+    normalized_keys = {_normalize_key(key) for key in keys}
 
     for key, value in row.items():
-        if (
-            _normalize_key(key)
-            in normalized_keys
-        ):
+        if _normalize_key(key) in normalized_keys:
             return value
 
     return None
@@ -1142,9 +990,7 @@ def _int(
         str,
     ):
         try:
-            return int(
-                value.strip()
-            )
+            return int(value.strip())
 
         except ValueError:
             return None
@@ -1159,11 +1005,7 @@ def _table_name(
     ],
     table_id: str | None,
 ) -> str | None:
-    table = (
-        tables_by_id.get(table_id)
-        if table_id
-        else None
-    )
+    table = tables_by_id.get(table_id) if table_id else None
 
     if table is None:
         return None
@@ -1183,11 +1025,7 @@ def _column_name(
     ],
     column_id: str | None,
 ) -> str | None:
-    column = (
-        columns_by_id.get(column_id)
-        if column_id
-        else None
-    )
+    column = columns_by_id.get(column_id) if column_id else None
 
     if column is None:
         return None
@@ -1219,10 +1057,7 @@ def _add_warning(
 def _connection_string_value(
     value: str,
 ) -> str:
-    if any(
-        character in value
-        for character in (";", "'")
-    ):
+    if any(character in value for character in (";", "'")):
         return (
             "'"
             + value.replace(
@@ -1280,8 +1115,6 @@ def _safe_exception_detail(
         )
 
     if len(message) > 300:
-        return (
-            f"{message[:300].rstrip()}..."
-        )
+        return f"{message[:300].rstrip()}..."
 
     return message

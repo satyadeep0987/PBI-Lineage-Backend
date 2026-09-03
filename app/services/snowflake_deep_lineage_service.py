@@ -382,9 +382,7 @@ class SnowflakeDeepLineageService:
             object_name=str(values["OBJECT_NAME"]),
             object_domain=str(values["OBJECT_DOMAIN"]),
             column_name=(column_name if isinstance(column_name, str) else None),
-            status=(
-                values["STATUS"] if isinstance(values["STATUS"], str) else None
-            ),
+            status=(values["STATUS"] if isinstance(values["STATUS"], str) else None),
             qualified_name=qualified_name,
         )
 

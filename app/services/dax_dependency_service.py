@@ -138,10 +138,7 @@ class DaxDependencyService:
             occupied.append(match.span())
 
         for match in _UNQUALIFIED_REFERENCE.finditer(cleaned):
-            if any(
-                start <= match.start() < end
-                for start, end in occupied
-            ):
+            if any(start <= match.start() < end for start, end in occupied):
                 continue
 
             object_name = match.group("object").replace("]]", "]").strip()
@@ -189,13 +186,9 @@ class DaxDependencyService:
         dependencies: list[DaxDependencyEdge],
     ) -> list[DaxDependencyCycle]:
         object_ids = {
-            item.qualified_name.casefold(): item.qualified_name
-            for item in objects
+            item.qualified_name.casefold(): item.qualified_name for item in objects
         }
-        adjacency: dict[str, set[str]] = {
-            object_id: set()
-            for object_id in object_ids
-        }
+        adjacency: dict[str, set[str]] = {object_id: set() for object_id in object_ids}
 
         for edge in dependencies:
             source = edge.source.qualified_name.casefold()
@@ -209,8 +202,7 @@ class DaxDependencyService:
         for component in strongly_connected_components(adjacency):
             has_self_loop = (
                 len(component) == 1
-                and next(iter(component))
-                in adjacency[next(iter(component))]
+                and next(iter(component)) in adjacency[next(iter(component))]
             )
 
             if len(component) > 1 or has_self_loop:
@@ -251,9 +243,7 @@ class _DaxSymbols:
             self.tables[table.name.casefold()] = table_reference
 
             if table.expression:
-                self._owners.append(
-                    _ExpressionOwner(table_reference, table.expression)
-                )
+                self._owners.append(_ExpressionOwner(table_reference, table.expression))
 
             for column in table.columns:
                 column_reference = _reference(
@@ -261,9 +251,9 @@ class _DaxSymbols:
                     table.name,
                     column.name,
                 )
-                self.columns[
-                    (table.name.casefold(), column.name.casefold())
-                ] = column_reference
+                self.columns[(table.name.casefold(), column.name.casefold())] = (
+                    column_reference
+                )
 
                 if column.expression:
                     self._owners.append(
@@ -276,9 +266,9 @@ class _DaxSymbols:
                     table.name,
                     measure.name,
                 )
-                self.measures[
-                    (table.name.casefold(), measure.name.casefold())
-                ] = measure_reference
+                self.measures[(table.name.casefold(), measure.name.casefold())] = (
+                    measure_reference
+                )
                 self.measures_by_name.setdefault(
                     measure.name.casefold(),
                     [],
@@ -319,9 +309,7 @@ class _DaxSymbols:
             return measures[0]
 
         if current_table:
-            return self.columns.get(
-                (current_table.casefold(), object_key)
-            )
+            return self.columns.get((current_table.casefold(), object_key))
 
         return None
 
@@ -366,11 +354,7 @@ def _strip_dax_comments_and_strings(expression: str) -> str:
 
     while index < len(expression):
         character = expression[index]
-        next_character = (
-            expression[index + 1]
-            if index + 1 < len(expression)
-            else ""
-        )
+        next_character = expression[index + 1] if index + 1 < len(expression) else ""
 
         if state == "code":
             if character == "/" and next_character == "/":
@@ -426,4 +410,3 @@ def _strip_dax_comments_and_strings(expression: str) -> str:
         index += 1
 
     return "".join(result)
-

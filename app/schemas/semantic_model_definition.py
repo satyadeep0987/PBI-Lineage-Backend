@@ -4,9 +4,7 @@ from pydantic import (
 )
 
 
-class SemanticModelDefinitionPart(
-    BaseModel
-):
+class SemanticModelDefinitionPart(BaseModel):
     path: str
     payload: str
 
@@ -15,19 +13,13 @@ class SemanticModelDefinitionPart(
     )
 
 
-class SemanticModelDefinition(
-    BaseModel
-):
+class SemanticModelDefinition(BaseModel):
     format: str | None = None
 
-    parts: list[
-        SemanticModelDefinitionPart
-    ]
+    parts: list[SemanticModelDefinitionPart]
 
 
-class SemanticModelDefinitionResponse(
-    BaseModel
-):
+class SemanticModelDefinitionResponse(BaseModel):
     workspace_id: str
     semantic_model_id: str
 

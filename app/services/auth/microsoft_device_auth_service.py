@@ -21,23 +21,17 @@ from app.services.auth.device_auth_store import (
 
 
 class MicrosoftDeviceAuthService:
-
     async def _wait_for_authentication(
         self,
         *,
         session_id: str,
     ) -> None:
-        session = get_device_session(
-            session_id
-        )
+        session = get_device_session(session_id)
 
         if session is None:
             return
 
-        authority = (
-            f"{MICROSOFT_LOGIN_BASE_URL}/"
-            f"{session.tenant_id}"
-        )
+        authority = f"{MICROSOFT_LOGIN_BASE_URL}/{session.tenant_id}"
 
         app = msal.PublicClientApplication(
             client_id=session.client_id,
@@ -49,9 +43,7 @@ class MicrosoftDeviceAuthService:
             session.flow,
         )
 
-        access_token = result.get(
-            "access_token"
-        )
+        access_token = result.get("access_token")
 
         if not access_token:
             error_code = str(
@@ -75,12 +67,9 @@ class MicrosoftDeviceAuthService:
             )
         )
 
-        powerbi_expires_at = (
-            time()
-            + max(
-                expires_in - 60,
-                60,
-            )
+        powerbi_expires_at = time() + max(
+            expires_in - 60,
+            60,
         )
 
         powerbi_client = PowerBIClient()
@@ -118,32 +107,24 @@ class MicrosoftDeviceAuthService:
         *,
         session_id: str,
     ) -> None:
-        session = get_device_session(
-            session_id
-        )
+        session = get_device_session(session_id)
 
         if session is None:
             return
 
-        authority = (
-            f"{MICROSOFT_LOGIN_BASE_URL}/"
-            f"{session.tenant_id}"
-        )
+        authority = f"{MICROSOFT_LOGIN_BASE_URL}/{session.tenant_id}"
 
         app = msal.PublicClientApplication(
             client_id=session.client_id,
             authority=authority,
         )
 
-        
         result = await asyncio.to_thread(
             app.acquire_token_by_device_flow,
             session.fabric_flow,
         )
 
-        access_token = result.get(
-            "access_token"
-        )
+        access_token = result.get("access_token")
 
         if not access_token:
             error_code = str(
@@ -161,8 +142,6 @@ class MicrosoftDeviceAuthService:
 
             return
 
-        
-
         expires_in = int(
             result.get(
                 "expires_in",
@@ -170,12 +149,9 @@ class MicrosoftDeviceAuthService:
             )
         )
 
-        expires_at = (
-            time()
-            + max(
-                expires_in - 60,
-                60,
-            )
+        expires_at = time() + max(
+            expires_in - 60,
+            60,
         )
 
         fabric_client = FabricClient()
@@ -197,7 +173,6 @@ class MicrosoftDeviceAuthService:
         session.fabric_error_code = None
         session.fabric_flow.clear()
 
-
     async def _try_acquire_fabric_token(
         self,
         *,
@@ -208,9 +183,7 @@ class MicrosoftDeviceAuthService:
         try:
             if not accounts:
                 session.fabric_connected = False
-                session.fabric_error_code = (
-                    "account_not_cached"
-                )
+                session.fabric_error_code = "account_not_cached"
                 session.fabric_granted_scopes.clear()
                 return
 
@@ -225,24 +198,18 @@ class MicrosoftDeviceAuthService:
             if not result:
                 session.fabric_connected = False
                 session.fabric_granted_scopes.clear()
-                session.fabric_error_code = (
-                    "interaction_required"
-                )
+                session.fabric_error_code = "interaction_required"
 
                 return
 
-            access_token = result.get(
-                "access_token"
-            )
+            access_token = result.get("access_token")
 
             if not access_token:
                 session.fabric_connected = False
 
-                session.fabric_error_code = (
-                    result.get(
-                        "error",
-                        "interaction_required",
-                    )
+                session.fabric_error_code = result.get(
+                    "error",
+                    "interaction_required",
                 )
 
                 session.fabric_granted_scopes.clear()
@@ -256,31 +223,20 @@ class MicrosoftDeviceAuthService:
                 )
             )
 
-            expires_at = (
-                time()
-                + max(
-                    expires_in - 60,
-                    60,
-                )
+            expires_at = time() + max(
+                expires_in - 60,
+                60,
             )
 
             fabric_client = FabricClient()
 
-            await fabric_client.validate_connection(
-                access_token
-            )
+            await fabric_client.validate_connection(access_token)
 
-            session.fabric_access_token = (
-                access_token
-            )
+            session.fabric_access_token = access_token
 
-            session.fabric_token_expires_at = (
-                expires_at
-            )
+            session.fabric_token_expires_at = expires_at
 
-            session.fabric_granted_scopes = (
-                extract_granted_scopes(result)
-            )
+            session.fabric_granted_scopes = extract_granted_scopes(result)
 
             session.fabric_connected = True
             session.fabric_error_code = None
@@ -291,17 +247,13 @@ class MicrosoftDeviceAuthService:
             session.fabric_error_code = exc.code
             session.fabric_granted_scopes.clear()
 
-
     async def start(
         self,
         *,
         tenant_id: str,
         client_id: str,
     ) -> tuple[str, dict]:
-        authority = (
-            f"{MICROSOFT_LOGIN_BASE_URL}/"
-            f"{tenant_id}"
-        )
+        authority = f"{MICROSOFT_LOGIN_BASE_URL}/{tenant_id}"
 
         app = msal.PublicClientApplication(
             client_id=client_id,
@@ -313,14 +265,9 @@ class MicrosoftDeviceAuthService:
         )
 
         if "user_code" not in flow:
-            raise RuntimeError(
-                "Microsoft device authentication "
-                "could not be started."
-            )
+            raise RuntimeError("Microsoft device authentication could not be started.")
 
-        session_id = str(
-            uuid4()
-        )
+        session_id = str(uuid4())
 
         save_device_session(
             session_id,
@@ -344,20 +291,12 @@ class MicrosoftDeviceAuthService:
         *,
         session_id: str,
     ) -> dict:
-        session = get_device_session(
-            session_id
-        )
+        session = get_device_session(session_id)
 
         if session is None:
-            raise RuntimeError(
-                "Authentication session "
-                "does not exist."
-            )
+            raise RuntimeError("Authentication session does not exist.")
 
-        authority = (
-            f"{MICROSOFT_LOGIN_BASE_URL}/"
-            f"{session.tenant_id}"
-        )
+        authority = f"{MICROSOFT_LOGIN_BASE_URL}/{session.tenant_id}"
 
         app = msal.PublicClientApplication(
             client_id=session.client_id,
@@ -369,10 +308,7 @@ class MicrosoftDeviceAuthService:
         )
 
         if "user_code" not in flow:
-            raise RuntimeError(
-                "Fabric authentication "
-                "could not be started."
-            )
+            raise RuntimeError("Fabric authentication could not be started.")
 
         session.fabric_flow = flow
 

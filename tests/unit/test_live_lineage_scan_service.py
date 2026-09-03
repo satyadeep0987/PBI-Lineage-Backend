@@ -32,9 +32,7 @@ def _semantic_model() -> ParsedSemanticModelResponse:
                     ParsedSemanticModelPartition(
                         name="Sales",
                         source_type="m",
-                        expression=(
-                            'Sql.Database("sql.example.com", "warehouse")'
-                        ),
+                        expression=('Sql.Database("sql.example.com", "warehouse")'),
                     )
                 ],
             )
@@ -117,7 +115,9 @@ async def test_live_scan_continues_when_gateway_metadata_is_forbidden():
         powerbi_access_token="powerbi-token",
     )
 
-    assert any("Gateway metadata could not be included" in item for item in graph.warnings)
+    assert any(
+        "Gateway metadata could not be included" in item for item in graph.warnings
+    )
     assert any(node.node_type == "physical_source" for node in graph.nodes)
 
 

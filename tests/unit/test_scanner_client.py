@@ -29,10 +29,7 @@ async def test_get_modified_workspaces_uses_admin_endpoint(monkeypatch):
     assert len(result) == 1
     provider_get.assert_awaited_once_with(
         provider="powerbi",
-        url=(
-            "https://api.powerbi.com/v1.0/myorg/"
-            "admin/workspaces/modified"
-        ),
+        url=("https://api.powerbi.com/v1.0/myorg/admin/workspaces/modified"),
         access_token="token",
         params={
             "excludePersonalWorkspaces": True,
@@ -71,10 +68,7 @@ async def test_start_workspace_scan_forwards_all_scan_options(monkeypatch):
 
     provider_post.assert_awaited_once_with(
         provider="powerbi",
-        url=(
-            "https://api.powerbi.com/v1.0/myorg/"
-            "admin/workspaces/getInfo"
-        ),
+        url=("https://api.powerbi.com/v1.0/myorg/admin/workspaces/getInfo"),
         access_token="token",
         params={
             "lineage": True,
@@ -83,11 +77,7 @@ async def test_start_workspace_scan_forwards_all_scan_options(monkeypatch):
             "datasetExpressions": True,
             "getArtifactUsers": False,
         },
-        json_body={
-            "workspaces": [
-                "11111111-1111-1111-1111-111111111111"
-            ]
-        },
+        json_body={"workspaces": ["11111111-1111-1111-1111-111111111111"]},
     )
 
 
@@ -104,9 +94,7 @@ async def test_scan_reads_use_scan_id_endpoint(
     method_name,
     path,
 ):
-    provider_get = AsyncMock(
-        return_value=httpx.Response(200, json={})
-    )
+    provider_get = AsyncMock(return_value=httpx.Response(200, json={}))
     monkeypatch.setattr(
         "app.clients.powerbi_client.provider_get",
         provider_get,
@@ -120,10 +108,7 @@ async def test_scan_reads_use_scan_id_endpoint(
 
     provider_get.assert_awaited_once_with(
         provider="powerbi",
-        url=(
-            "https://api.powerbi.com/v1.0/myorg/admin/"
-            f"workspaces/{path}/{scan_id}"
-        ),
+        url=(f"https://api.powerbi.com/v1.0/myorg/admin/workspaces/{path}/{scan_id}"),
         access_token="token",
         not_found_resource="scanner scan",
     )

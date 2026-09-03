@@ -111,10 +111,7 @@ async def test_wait_for_authentication_sets_failed_when_powerbi_validation_fails
         assert session.status == "failed"
         assert session.powerbi_access_token is None
         assert session.powerbi_connected is False
-        assert (
-            session.powerbi_error_code
-            == "AUTH_INSUFFICIENT_PERMISSIONS"
-        )
+        assert session.powerbi_error_code == "AUTH_INSUFFICIENT_PERMISSIONS"
         assert session.fabric_connected is None
 
     finally:
@@ -129,11 +126,7 @@ async def test_wait_for_authentication_keeps_powerbi_when_fabric_account_not_cac
         device_result={
             "access_token": "powerbi-token",
             "expires_in": 3600,
-            "scope": (
-                "Workspace.Read.All "
-                "Report.Read.All "
-                "Dataset.Read.All"
-            ),
+            "scope": ("Workspace.Read.All Report.Read.All Dataset.Read.All"),
         },
         accounts=[],
     )
@@ -191,10 +184,7 @@ async def test_try_acquire_fabric_token_stores_token_and_granted_scopes(
         silent_result={
             "access_token": "fabric-token",
             "expires_in": 3600,
-            "scope": (
-                "Workspace.Read.All "
-                "Item.ReadWrite.All"
-            ),
+            "scope": ("Workspace.Read.All Item.ReadWrite.All"),
         },
     )
 
@@ -238,9 +228,7 @@ async def test_try_acquire_fabric_token_sets_interaction_required_without_token(
         tenant_id="tenant",
         client_id="client",
     )
-    session.fabric_granted_scopes = [
-        "Workspace.Read.All"
-    ]
+    session.fabric_granted_scopes = ["Workspace.Read.All"]
 
     service = MicrosoftDeviceAuthService()
 
@@ -288,8 +276,5 @@ async def test_try_acquire_fabric_token_preserves_validation_error_code(
 
     assert session.fabric_access_token is None
     assert session.fabric_connected is False
-    assert (
-        session.fabric_error_code
-        == "AUTH_INSUFFICIENT_PERMISSIONS"
-    )
+    assert session.fabric_error_code == "AUTH_INSUFFICIENT_PERMISSIONS"
     assert session.fabric_granted_scopes == []

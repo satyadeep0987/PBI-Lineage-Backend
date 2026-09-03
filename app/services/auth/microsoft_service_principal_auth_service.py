@@ -64,13 +64,9 @@ class MicrosoftServicePrincipalAuthService:
         application = msal.ConfidentialClientApplication(
             client_id=client_id,
             client_credential=client_secret,
-            authority=(
-                f"{MICROSOFT_LOGIN_BASE_URL}/{tenant_id}"
-            ),
+            authority=(f"{MICROSOFT_LOGIN_BASE_URL}/{tenant_id}"),
         )
-        result = application.acquire_token_for_client(
-            scopes=[scope]
-        )
+        result = application.acquire_token_for_client(scopes=[scope])
         if not isinstance(result, dict):
             return {"error": "invalid_token_response"}
         return result
@@ -122,9 +118,7 @@ class MicrosoftServicePrincipalAuthService:
             raise ProviderAuthenticationFailedError("powerbi")
 
         fabric_token = fabric_result.get("access_token")
-        fabric_connected = (
-            isinstance(fabric_token, str) and bool(fabric_token)
-        )
+        fabric_connected = isinstance(fabric_token, str) and bool(fabric_token)
         fabric_error_code = None
         if not fabric_connected:
             fabric_error_code = self._error_code(
@@ -141,26 +135,16 @@ class MicrosoftServicePrincipalAuthService:
                 authentication_method="client_secret",
                 status="authenticated",
                 powerbi_access_token=powerbi_token,
-                powerbi_token_expires_at=self._expires_at(
-                    powerbi_result
-                ),
-                fabric_access_token=(
-                    fabric_token if fabric_connected else None
-                ),
+                powerbi_token_expires_at=self._expires_at(powerbi_result),
+                fabric_access_token=(fabric_token if fabric_connected else None),
                 fabric_token_expires_at=(
-                    self._expires_at(fabric_result)
-                    if fabric_connected
-                    else None
+                    self._expires_at(fabric_result) if fabric_connected else None
                 ),
                 powerbi_connected=True,
                 fabric_connected=fabric_connected,
-                powerbi_granted_scopes=(
-                    extract_granted_scopes(powerbi_result)
-                ),
+                powerbi_granted_scopes=(extract_granted_scopes(powerbi_result)),
                 fabric_granted_scopes=(
-                    extract_granted_scopes(fabric_result)
-                    if fabric_connected
-                    else []
+                    extract_granted_scopes(fabric_result) if fabric_connected else []
                 ),
                 fabric_error_code=fabric_error_code,
             ),
@@ -181,9 +165,7 @@ class MicrosoftServicePrincipalAuthService:
         fabric_acquired = get_fabric_token(session_id) is not None
         if not powerbi_acquired:
             raise InvalidAccessTokenError("powerbi")
-        status = (
-            "authenticated" if fabric_acquired else "partial"
-        )
+        status = "authenticated" if fabric_acquired else "partial"
 
         return MicrosoftServicePrincipalAuthResponse(
             session_id=session_id,
@@ -192,9 +174,7 @@ class MicrosoftServicePrincipalAuthService:
                 token_acquired=powerbi_acquired,
                 resource=POWERBI_RESOURCE,
                 requested_scope=POWERBI_APPLICATION_SCOPE,
-                granted_roles=list(
-                    session.powerbi_granted_scopes
-                ),
+                granted_roles=list(session.powerbi_granted_scopes),
                 error_code=session.powerbi_error_code,
                 message=(
                     "Power BI application token acquired."
@@ -206,9 +186,7 @@ class MicrosoftServicePrincipalAuthService:
                 token_acquired=fabric_acquired,
                 resource=FABRIC_RESOURCE,
                 requested_scope=FABRIC_APPLICATION_SCOPE,
-                granted_roles=list(
-                    session.fabric_granted_scopes
-                ),
+                granted_roles=list(session.fabric_granted_scopes),
                 error_code=session.fabric_error_code,
                 message=(
                     "Fabric application token acquired."

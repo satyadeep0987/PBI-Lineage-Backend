@@ -83,9 +83,7 @@ router = APIRouter()
 async def list_workspaces(
     access_token: Annotated[
         str,
-        Depends(
-            get_powerbi_access_token
-        ),
+        Depends(get_powerbi_access_token),
     ],
     top: Annotated[
         int,
@@ -118,9 +116,7 @@ async def get_workspace(
     workspace_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_powerbi_access_token
-        ),
+        Depends(get_powerbi_access_token),
     ],
 ) -> Workspace:
     service = WorkspaceService()
@@ -139,9 +135,7 @@ async def list_workspace_reports(
     workspace_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_powerbi_access_token
-        ),
+        Depends(get_powerbi_access_token),
     ],
 ) -> ReportListResponse:
     service = ReportService()
@@ -160,9 +154,7 @@ async def list_workspace_semantic_models(
     workspace_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_powerbi_access_token
-        ),
+        Depends(get_powerbi_access_token),
     ],
 ) -> SemanticModelListResponse:
     service = SemanticModelService()
@@ -171,6 +163,7 @@ async def list_workspace_semantic_models(
         workspace_id=str(workspace_id),
         access_token=access_token,
     )
+
 
 @router.get(
     "/{workspace_id}/reports/{report_id}",
@@ -181,9 +174,7 @@ async def get_workspace_report(
     report_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_powerbi_access_token
-        ),
+        Depends(get_powerbi_access_token),
     ],
 ) -> Report:
     service = ReportService()
@@ -194,6 +185,7 @@ async def get_workspace_report(
         access_token=access_token,
     )
 
+
 @router.get(
     "/{workspace_id}/reports/{report_id}/pages",
     response_model=ReportPageListResponse,
@@ -203,9 +195,7 @@ async def list_workspace_report_pages(
     report_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_powerbi_access_token
-        ),
+        Depends(get_powerbi_access_token),
     ],
 ) -> ReportPageListResponse:
     service = ReportService()
@@ -216,11 +206,9 @@ async def list_workspace_report_pages(
         access_token=access_token,
     )
 
+
 @router.get(
-    (
-        "/{workspace_id}/reports/"
-        "{report_id}/pages/{page_name}"
-    ),
+    ("/{workspace_id}/reports/{report_id}/pages/{page_name}"),
     response_model=ReportPage,
 )
 async def get_workspace_report_page(
@@ -235,9 +223,7 @@ async def get_workspace_report_page(
     ],
     access_token: Annotated[
         str,
-        Depends(
-            get_powerbi_access_token
-        ),
+        Depends(get_powerbi_access_token),
     ],
 ) -> ReportPage:
     service = ReportService()
@@ -249,23 +235,17 @@ async def get_workspace_report_page(
         access_token=access_token,
     )
 
+
 @router.post(
-    (
-        "/{workspace_id}/reports/"
-        "{report_id}/definition"
-    ),
-    response_model=(
-        ReportDefinitionResponse
-    ),
+    ("/{workspace_id}/reports/{report_id}/definition"),
+    response_model=(ReportDefinitionResponse),
 )
 async def get_workspace_report_definition(
     workspace_id: UUID,
     report_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_fabric_access_token
-        ),
+        Depends(get_fabric_access_token),
     ],
     definition_format: Annotated[
         Literal[
@@ -277,40 +257,26 @@ async def get_workspace_report_definition(
         ),
     ] = "PBIR",
 ) -> ReportDefinitionResponse:
-    service = (
-        ReportDefinitionService()
-    )
+    service = ReportDefinitionService()
 
     return await service.get_definition(
-        workspace_id=str(
-            workspace_id
-        ),
-        report_id=str(
-            report_id
-        ),
+        workspace_id=str(workspace_id),
+        report_id=str(report_id),
         access_token=access_token,
-        definition_format=(
-            definition_format
-        ),
+        definition_format=(definition_format),
     )
 
+
 @router.post(
-    (
-        "/{workspace_id}/reports/"
-        "{report_id}/definition/normalized"
-    ),
-    response_model=(
-        NormalizedReportDefinitionResponse
-    ),
+    ("/{workspace_id}/reports/{report_id}/definition/normalized"),
+    response_model=(NormalizedReportDefinitionResponse),
 )
 async def get_normalized_report_definition(
     workspace_id: UUID,
     report_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_fabric_access_token
-        ),
+        Depends(get_fabric_access_token),
     ],
     definition_format: Annotated[
         Literal[
@@ -322,43 +288,26 @@ async def get_normalized_report_definition(
         ),
     ] = "PBIR",
 ) -> NormalizedReportDefinitionResponse:
-    service = (
-        ReportDefinitionService()
-    )
+    service = ReportDefinitionService()
 
-    return await (
-        service.get_normalized_definition(
-            workspace_id=str(
-                workspace_id
-            ),
-            report_id=str(
-                report_id
-            ),
-            access_token=access_token,
-            definition_format=(
-                definition_format
-            ),
-        )
+    return await service.get_normalized_definition(
+        workspace_id=str(workspace_id),
+        report_id=str(report_id),
+        access_token=access_token,
+        definition_format=(definition_format),
     )
 
 
 @router.post(
-    (
-        "/{workspace_id}/semantic-models/"
-        "{semantic_model_id}/definition"
-    ),
-    response_model=(
-        SemanticModelDefinitionResponse
-    ),
+    ("/{workspace_id}/semantic-models/{semantic_model_id}/definition"),
+    response_model=(SemanticModelDefinitionResponse),
 )
 async def get_workspace_semantic_model_definition(
     workspace_id: UUID,
     semantic_model_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_fabric_access_token
-        ),
+        Depends(get_fabric_access_token),
     ],
     definition_format: Annotated[
         Literal[
@@ -370,28 +319,18 @@ async def get_workspace_semantic_model_definition(
         ),
     ] = "TMDL",
 ) -> SemanticModelDefinitionResponse:
-    service = (
-        SemanticModelDefinitionService()
-    )
+    service = SemanticModelDefinitionService()
 
     return await service.get_definition(
-        workspace_id=str(
-            workspace_id
-        ),
-        semantic_model_id=str(
-            semantic_model_id
-        ),
+        workspace_id=str(workspace_id),
+        semantic_model_id=str(semantic_model_id),
         access_token=access_token,
-        definition_format=(
-            definition_format
-        ),
+        definition_format=(definition_format),
     )
 
+
 @router.post(
-    (
-        "/{workspace_id}/semantic-models/"
-        "{semantic_model_id}/definition/parsed"
-    ),
+    ("/{workspace_id}/semantic-models/{semantic_model_id}/definition/parsed"),
     response_model=ParsedSemanticModelResponse,
 )
 async def get_workspace_parsed_semantic_model_definition(
@@ -399,9 +338,7 @@ async def get_workspace_parsed_semantic_model_definition(
     semantic_model_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_fabric_access_token
-        ),
+        Depends(get_fabric_access_token),
     ],
     definition_format: Annotated[
         Literal[
@@ -424,10 +361,7 @@ async def get_workspace_parsed_semantic_model_definition(
 
 
 @router.get(
-    (
-        "/{workspace_id}/semantic-models/"
-        "{semantic_model_id}/xmla/metadata"
-    ),
+    ("/{workspace_id}/semantic-models/{semantic_model_id}/xmla/metadata"),
     response_model=XmlaSemanticModelMetadataResponse,
 )
 async def get_workspace_semantic_model_xmla_metadata(
@@ -435,9 +369,7 @@ async def get_workspace_semantic_model_xmla_metadata(
     semantic_model_id: UUID,
     access_token: Annotated[
         str,
-        Depends(
-            get_powerbi_access_token
-        ),
+        Depends(get_powerbi_access_token),
     ],
     workspace_name: Annotated[
         str | None,
@@ -468,10 +400,7 @@ async def get_workspace_semantic_model_xmla_metadata(
 
 
 @router.get(
-    (
-        "/{workspace_id}/semantic-models/"
-        "{semantic_model_id}/metadata"
-    ),
+    ("/{workspace_id}/semantic-models/{semantic_model_id}/metadata"),
     response_model=SemanticModelMetadataResponse,
 )
 async def get_workspace_semantic_model_metadata(
@@ -479,15 +408,11 @@ async def get_workspace_semantic_model_metadata(
     semantic_model_id: UUID,
     fabric_access_token: Annotated[
         str,
-        Depends(
-            get_fabric_access_token
-        ),
+        Depends(get_fabric_access_token),
     ],
     powerbi_access_token: Annotated[
         str,
-        Depends(
-            get_powerbi_access_token
-        ),
+        Depends(get_powerbi_access_token),
     ],
     workspace_name: Annotated[
         str | None,
@@ -526,10 +451,7 @@ async def get_workspace_semantic_model_metadata(
 
 
 @router.post(
-    (
-        "/{workspace_id}/reports/"
-        "{report_id}/semantic-lineage"
-    ),
+    ("/{workspace_id}/reports/{report_id}/semantic-lineage"),
     response_model=ReportSemanticLineageResponse,
 )
 async def get_workspace_report_semantic_lineage(
@@ -541,9 +463,7 @@ async def get_workspace_report_semantic_lineage(
     ],
     access_token: Annotated[
         str,
-        Depends(
-            get_fabric_access_token
-        ),
+        Depends(get_fabric_access_token),
     ],
     semantic_model_workspace_id: Annotated[
         UUID | None,
@@ -570,25 +490,14 @@ async def get_workspace_report_semantic_lineage(
 ) -> ReportSemanticLineageResponse:
     service = ReportSemanticLineageService()
 
-    resolved_semantic_model_workspace_id = (
-        semantic_model_workspace_id
-        or workspace_id
-    )
+    resolved_semantic_model_workspace_id = semantic_model_workspace_id or workspace_id
 
     return await service.build_lineage(
         workspace_id=str(workspace_id),
         report_id=str(report_id),
-        semantic_model_workspace_id=str(
-            resolved_semantic_model_workspace_id
-        ),
-        semantic_model_id=str(
-            semantic_model_id
-        ),
+        semantic_model_workspace_id=str(resolved_semantic_model_workspace_id),
+        semantic_model_id=str(semantic_model_id),
         access_token=access_token,
-        report_definition_format=(
-            report_definition_format
-        ),
-        semantic_model_definition_format=(
-            semantic_model_definition_format
-        ),
+        report_definition_format=(report_definition_format),
+        semantic_model_definition_format=(semantic_model_definition_format),
     )

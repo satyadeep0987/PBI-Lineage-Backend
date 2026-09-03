@@ -1168,7 +1168,7 @@ FastAPI :8000
 Do not permanently use:
 
 ```python
-allow_origins=["*"]
+allow_origins = ["*"]
 ```
 
 especially once credentials or authentication headers are involved.

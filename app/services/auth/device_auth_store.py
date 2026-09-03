@@ -12,17 +12,11 @@ class DeviceAuthSession:
 
     authentication_method: str = "device_code"
 
-    flow: dict[str, Any] = field(
-        default_factory=dict
-    )
+    flow: dict[str, Any] = field(default_factory=dict)
 
-    fabric_flow: dict[str, Any] = field(
-        default_factory=dict
-    )
+    fabric_flow: dict[str, Any] = field(default_factory=dict)
 
-    created_at: float = field(
-        default_factory=time
-    )
+    created_at: float = field(default_factory=time)
 
     status: str = "pending"
 
@@ -59,20 +53,13 @@ def save_device_session(
 def get_device_session(
     session_id: str,
 ) -> DeviceAuthSession | None:
-    session = _device_sessions.get(
-        session_id
-    )
+    session = _device_sessions.get(session_id)
 
     if session is None:
         return None
 
-    if (
-        time() - session.created_at
-        > SESSION_MAX_AGE_SECONDS
-    ):
-        delete_device_session(
-            session_id
-        )
+    if time() - session.created_at > SESSION_MAX_AGE_SECONDS:
+        delete_device_session(session_id)
 
         return None
 
@@ -82,9 +69,7 @@ def get_device_session(
 def get_powerbi_token(
     session_id: str,
 ) -> str | None:
-    session = get_device_session(
-        session_id
-    )
+    session = get_device_session(session_id)
 
     if session is None:
         return None
@@ -94,14 +79,9 @@ def get_powerbi_token(
     if not token:
         return None
 
-    expires_at = (
-        session.powerbi_token_expires_at
-    )
+    expires_at = session.powerbi_token_expires_at
 
-    if (
-        expires_at is not None
-        and time() >= expires_at
-    ):
+    if expires_at is not None and time() >= expires_at:
         session.powerbi_access_token = None
         session.powerbi_connected = False
         session.powerbi_granted_scopes.clear()
@@ -115,9 +95,7 @@ def get_powerbi_token(
 def get_fabric_token(
     session_id: str,
 ) -> str | None:
-    session = get_device_session(
-        session_id
-    )
+    session = get_device_session(session_id)
 
     if session is None:
         return None
@@ -127,14 +105,9 @@ def get_fabric_token(
     if not token:
         return None
 
-    expires_at = (
-        session.fabric_token_expires_at
-    )
+    expires_at = session.fabric_token_expires_at
 
-    if (
-        expires_at is not None
-        and time() >= expires_at
-    ):
+    if expires_at is not None and time() >= expires_at:
         session.fabric_access_token = None
         session.fabric_connected = False
         session.fabric_granted_scopes.clear()
@@ -148,10 +121,7 @@ def get_fabric_token(
 def delete_device_session(
     session_id: str,
 ) -> None:
-    session = _device_sessions.pop(
-        session_id,
-        None
-    )
+    session = _device_sessions.pop(session_id, None)
 
     if session is None:
         return

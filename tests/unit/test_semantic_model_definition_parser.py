@@ -13,12 +13,7 @@ from app.services.semantic_model_definition_parser import (
 def _encode(
     text: str,
 ) -> str:
-    return (
-        base64.b64encode(
-            text.encode("utf-8")
-        )
-        .decode("ascii")
-    )
+    return base64.b64encode(text.encode("utf-8")).decode("ascii")
 
 
 def _raw_definition(
@@ -50,19 +45,14 @@ table Sales
 """
     )
 
-    result = SemanticModelDefinitionParser().parse(
-        raw
-    )
+    result = SemanticModelDefinitionParser().parse(raw)
 
     assert result.workspace_id == "workspace-123"
     assert result.semantic_model_id == "model-123"
     assert result.format == "TMDL"
     assert len(result.tables) == 1
     assert result.tables[0].name == "Sales"
-    assert (
-        result.tables[0].source_path
-        == "definition/tables/Sales.tmdl"
-    )
+    assert result.tables[0].source_path == "definition/tables/Sales.tmdl"
 
 
 def test_parse_tmdl_column():
@@ -76,9 +66,7 @@ table Sales
 """
     )
 
-    result = SemanticModelDefinitionParser().parse(
-        raw
-    )
+    result = SemanticModelDefinitionParser().parse(raw)
 
     column = result.tables[0].columns[0]
 
@@ -86,10 +74,7 @@ table Sales
     assert column.data_type == "decimal"
     assert column.source_column == "Amount"
     assert column.is_hidden is False
-    assert (
-        column.source_path
-        == "definition/tables/Sales.tmdl"
-    )
+    assert column.source_path == "definition/tables/Sales.tmdl"
 
 
 def test_parse_tmdl_measure():
@@ -102,9 +87,7 @@ table Sales
 """
     )
 
-    result = SemanticModelDefinitionParser().parse(
-        raw
-    )
+    result = SemanticModelDefinitionParser().parse(raw)
 
     measure = result.tables[0].measures[0]
 
@@ -112,10 +95,7 @@ table Sales
     assert measure.expression == "SUM(Sales[Amount])"
     assert measure.format_string == "$#,0.00"
     assert measure.is_hidden is False
-    assert (
-        measure.source_path
-        == "definition/tables/Sales.tmdl"
-    )
+    assert measure.source_path == "definition/tables/Sales.tmdl"
 
 
 def test_parse_tmdl_quoted_names_and_multiline_measure_expression():
@@ -135,9 +115,7 @@ table 'Sales Data'
 """
     )
 
-    result = SemanticModelDefinitionParser().parse(
-        raw
-    )
+    result = SemanticModelDefinitionParser().parse(raw)
 
     table = result.tables[0]
     column = table.columns[0]
@@ -148,12 +126,7 @@ table 'Sales Data'
     assert column.source_column == "Order Amount"
     assert column.is_hidden is True
     assert measure.name == "Total Sales"
-    assert measure.expression == (
-        "SUMX(\n"
-        "Sales,\n"
-        "Sales[Amount]\n"
-        ")"
-    )
+    assert measure.expression == ("SUMX(\nSales,\nSales[Amount]\n)")
     assert measure.format_string == "$#,0.00"
 
 
@@ -168,16 +141,11 @@ table Sales
 """
     )
 
-    result = SemanticModelDefinitionParser().parse(
-        raw
-    )
+    result = SemanticModelDefinitionParser().parse(raw)
 
     measure = result.tables[0].measures[0]
 
-    assert measure.expression == (
-        "VAR Total = SUM(Sales[Amount])\n"
-        "RETURN Total"
-    )
+    assert measure.expression == ("VAR Total = SUM(Sales[Amount])\nRETURN Total")
 
 
 def test_parse_tmdl_relationship():
@@ -192,9 +160,7 @@ relationship SalesCustomer
 """
     )
 
-    result = SemanticModelDefinitionParser().parse(
-        raw
-    )
+    result = SemanticModelDefinitionParser().parse(raw)
 
     relationship = result.relationships[0]
 
@@ -205,14 +171,8 @@ relationship SalesCustomer
     assert relationship.to_column == "CustomerId"
     assert relationship.is_active is True
     assert relationship.cardinality == "manyToOne"
-    assert (
-        relationship.cross_filter_direction
-        == "bothDirections"
-    )
-    assert (
-        relationship.source_path
-        == "definition/tables/Sales.tmdl"
-    )
+    assert relationship.cross_filter_direction == "bothDirections"
+    assert relationship.source_path == "definition/tables/Sales.tmdl"
 
 
 def test_parse_tmdl_relationship_dot_references():
@@ -289,12 +249,7 @@ table Summary
     assert summary.columns[0].name == "DoubleAmount"
     assert summary.columns[0].expression == "Sales[Amount] * 2"
     assert summary.partitions[0].source_type == "calculated"
-    assert summary.expression == (
-        "SUMMARIZE(\n"
-        "Sales,\n"
-        "Sales[Amount]\n"
-        ")"
-    )
+    assert summary.expression == ("SUMMARIZE(\nSales,\nSales[Amount]\n)")
 
 
 def test_invalid_base64_adds_warning():
@@ -313,20 +268,12 @@ def test_invalid_base64_adds_warning():
         ),
     )
 
-    result = SemanticModelDefinitionParser().parse(
-        raw
-    )
+    result = SemanticModelDefinitionParser().parse(raw)
 
     assert result.tables == []
     assert len(result.warnings) == 1
-    assert (
-        result.warnings[0].code
-        == "INVALID_BASE64_PAYLOAD"
-    )
-    assert (
-        result.warnings[0].path
-        == "definition/tables/Sales.tmdl"
-    )
+    assert result.warnings[0].code == "INVALID_BASE64_PAYLOAD"
+    assert result.warnings[0].path == "definition/tables/Sales.tmdl"
 
 
 def test_tmsl_returns_unsupported_warning():
@@ -335,13 +282,8 @@ def test_tmsl_returns_unsupported_warning():
         definition_format="TMSL",
     )
 
-    result = SemanticModelDefinitionParser().parse(
-        raw
-    )
+    result = SemanticModelDefinitionParser().parse(raw)
 
     assert result.tables == []
     assert len(result.warnings) == 1
-    assert (
-        result.warnings[0].code
-        == "UNSUPPORTED_FORMAT"
-    )
+    assert result.warnings[0].code == "UNSUPPORTED_FORMAT"

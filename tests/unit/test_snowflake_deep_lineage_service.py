@@ -61,8 +61,7 @@ class _ParallelQueryClient:
         try:
             if object_name == "DB.SCHEMA.TARGET.VALUE":
                 return [
-                    _row(f"SOURCE_{index}", "TARGET", distance=5)
-                    for index in range(7)
+                    _row(f"SOURCE_{index}", "TARGET", distance=5) for index in range(7)
                 ]
             sleep(0.02)
             source_name = object_name.split(".")[-2]
@@ -144,9 +143,7 @@ def test_table_lineage_uses_table_domain_without_column_suffix():
 
 
 def test_already_visited_five_level_frontier_is_not_queried_again():
-    query_client = _StaticQueryClient(
-        [_row("TARGET", "TARGET", distance=5)]
-    )
+    query_client = _StaticQueryClient([_row("TARGET", "TARGET", distance=5)])
 
     result = SnowflakeDeepLineageService(query_client=query_client).trace(
         object(),
@@ -160,15 +157,12 @@ def test_already_visited_five_level_frontier_is_not_queried_again():
 
     assert result.query_count == 1
     assert any(
-        warning.code == "SNOWFLAKE_LINEAGE_CYCLE_SKIPPED"
-        for warning in result.warnings
+        warning.code == "SNOWFLAKE_LINEAGE_CYCLE_SKIPPED" for warning in result.warnings
     )
 
 
 def test_query_limit_marks_response_truncated():
-    query_client = _StaticQueryClient(
-        [_row("SOURCE", "TARGET", distance=5)]
-    )
+    query_client = _StaticQueryClient([_row("SOURCE", "TARGET", distance=5)])
 
     result = SnowflakeDeepLineageService(query_client=query_client).trace(
         object(),
@@ -252,8 +246,7 @@ def test_non_root_branch_failure_returns_partial_lineage_with_warning():
     assert result.snapshot.dependency_count == 1
     assert result.truncated is True
     assert any(
-        warning.code == "SNOWFLAKE_LINEAGE_BRANCH_FAILED"
-        for warning in result.warnings
+        warning.code == "SNOWFLAKE_LINEAGE_BRANCH_FAILED" for warning in result.warnings
     )
 
 

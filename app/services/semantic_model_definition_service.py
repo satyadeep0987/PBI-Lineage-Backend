@@ -44,69 +44,39 @@ class SemanticModelDefinitionService:
         access_token: str,
         initial_response: httpx.Response,
     ) -> SemanticModelDefinitionResponse:
-        operation_id = (
-            initial_response.headers.get(
-                "x-ms-operation-id"
-            )
-        )
+        operation_id = initial_response.headers.get("x-ms-operation-id")
 
         if not operation_id:
-            raise UpstreamInvalidResponseError(
-                "fabric"
-            )
+            raise UpstreamInvalidResponseError("fabric")
 
-        deadline = (
-            monotonic()
-            + self.MAX_TOTAL_WAIT_SECONDS
-        )
+        deadline = monotonic() + self.MAX_TOTAL_WAIT_SECONDS
 
-        retry_after = (
-            self._get_retry_after(
-                initial_response
-            )
-        )
+        retry_after = self._get_retry_after(initial_response)
 
         while True:
-            remaining = (
-                deadline - monotonic()
-            )
+            remaining = deadline - monotonic()
 
             if remaining <= 0:
-                raise UpstreamTimeoutError(
-                    "fabric"
-                )
+                raise UpstreamTimeoutError("fabric")
 
             if retry_after > remaining:
-                raise UpstreamTimeoutError(
-                    "fabric"
-                )
+                raise UpstreamTimeoutError("fabric")
 
-            await asyncio.sleep(
-                retry_after
+            await asyncio.sleep(retry_after)
+
+            response = await self.client.get_operation_state(
+                operation_id=operation_id,
+                access_token=access_token,
             )
 
-            response = (
-                await self.client
-                .get_operation_state(
-                    operation_id=operation_id,
-                    access_token=access_token,
-                )
-            )
+            payload = self._parse_object(response)
 
-            payload = self._parse_object(
-                response
-            )
-
-            status = payload.get(
-                "status"
-            )
+            status = payload.get("status")
 
             if status == "Succeeded":
                 return await self._get_result(
                     workspace_id=workspace_id,
-                    semantic_model_id=(
-                        semantic_model_id
-                    ),
+                    semantic_model_id=(semantic_model_id),
                     operation_id=operation_id,
                     access_token=access_token,
                 )
@@ -114,28 +84,16 @@ class SemanticModelDefinitionService:
             if status == "Failed":
                 raise UpstreamRequestError(
                     "fabric",
-                    detail=(
-                        provider_error_detail_from_payload(
-                            payload
-                        )
-                    ),
+                    detail=(provider_error_detail_from_payload(payload)),
                 )
 
             if not isinstance(
                 status,
                 str,
             ):
-                raise (
-                    UpstreamInvalidResponseError(
-                        "fabric"
-                    )
-                )
+                raise (UpstreamInvalidResponseError("fabric"))
 
-            retry_after = (
-                self._get_retry_after(
-                    response
-                )
-            )
+            retry_after = self._get_retry_after(response)
 
     async def _get_result(
         self,
@@ -145,23 +103,16 @@ class SemanticModelDefinitionService:
         operation_id: str,
         access_token: str,
     ) -> SemanticModelDefinitionResponse:
-        response = (
-            await self.client
-            .get_operation_result(
-                operation_id=operation_id,
-                access_token=access_token,
-            )
+        response = await self.client.get_operation_result(
+            operation_id=operation_id,
+            access_token=access_token,
         )
 
-        payload = self._parse_object(
-            response
-        )
+        payload = self._parse_object(response)
 
         return self._map_definition(
             workspace_id=workspace_id,
-            semantic_model_id=(
-                semantic_model_id
-            ),
+            semantic_model_id=(semantic_model_id),
             payload=payload,
         )
 
@@ -173,17 +124,13 @@ class SemanticModelDefinitionService:
             payload = response.json()
 
         except ValueError as exc:
-            raise UpstreamInvalidResponseError(
-                "fabric"
-            ) from exc
+            raise UpstreamInvalidResponseError("fabric") from exc
 
         if not isinstance(
             payload,
             dict,
         ):
-            raise UpstreamInvalidResponseError(
-                "fabric"
-            )
+            raise UpstreamInvalidResponseError("fabric")
 
         return payload
 
@@ -194,60 +141,36 @@ class SemanticModelDefinitionService:
         semantic_model_id: str,
         payload: dict[str, Any],
     ) -> SemanticModelDefinitionResponse:
-        raw_definition = payload.get(
-            "definition"
-        )
+        raw_definition = payload.get("definition")
 
         if not isinstance(
             raw_definition,
             dict,
         ):
-            raise UpstreamInvalidResponseError(
-                "fabric"
-            )
+            raise UpstreamInvalidResponseError("fabric")
 
-        raw_parts = raw_definition.get(
-            "parts"
-        )
+        raw_parts = raw_definition.get("parts")
 
         if not isinstance(
             raw_parts,
             list,
         ):
-            raise UpstreamInvalidResponseError(
-                "fabric"
-            )
+            raise UpstreamInvalidResponseError("fabric")
 
-        parts: list[
-            SemanticModelDefinitionPart
-        ] = []
+        parts: list[SemanticModelDefinitionPart] = []
 
         for raw_part in raw_parts:
             if not isinstance(
                 raw_part,
                 dict,
             ):
-                raise (
-                    UpstreamInvalidResponseError(
-                        "fabric"
-                    )
-                )
+                raise (UpstreamInvalidResponseError("fabric"))
 
-            path = raw_part.get(
-                "path"
-            )
+            path = raw_part.get("path")
 
-            encoded_payload = (
-                raw_part.get(
-                    "payload"
-                )
-            )
+            encoded_payload = raw_part.get("payload")
 
-            payload_type = (
-                raw_part.get(
-                    "payloadType"
-                )
-            )
+            payload_type = raw_part.get("payloadType")
 
             if (
                 not isinstance(
@@ -256,21 +179,13 @@ class SemanticModelDefinitionService:
                 )
                 or not path
             ):
-                raise (
-                    UpstreamInvalidResponseError(
-                        "fabric"
-                    )
-                )
+                raise (UpstreamInvalidResponseError("fabric"))
 
             if not isinstance(
                 encoded_payload,
                 str,
             ):
-                raise (
-                    UpstreamInvalidResponseError(
-                        "fabric"
-                    )
-                )
+                raise (UpstreamInvalidResponseError("fabric"))
 
             if (
                 not isinstance(
@@ -279,86 +194,52 @@ class SemanticModelDefinitionService:
                 )
                 or not payload_type
             ):
-                raise (
-                    UpstreamInvalidResponseError(
-                        "fabric"
-                    )
-                )
+                raise (UpstreamInvalidResponseError("fabric"))
 
             parts.append(
                 SemanticModelDefinitionPart(
                     path=path,
                     payload=encoded_payload,
-                    payload_type=(
-                        payload_type
-                    ),
+                    payload_type=(payload_type),
                 )
             )
 
-        definition_format = (
-            raw_definition.get(
-                "format"
-            )
-        )
+        definition_format = raw_definition.get("format")
 
-        if (
-            definition_format
-            is not None
-            and not isinstance(
-                definition_format,
-                str,
-            )
+        if definition_format is not None and not isinstance(
+            definition_format,
+            str,
         ):
-            raise UpstreamInvalidResponseError(
-                "fabric"
-            )
+            raise UpstreamInvalidResponseError("fabric")
 
-        return (
-            SemanticModelDefinitionResponse(
-                workspace_id=workspace_id,
-                semantic_model_id=(
-                    semantic_model_id
-                ),
-                definition=(
-                    SemanticModelDefinition(
-                        format=(
-                            definition_format
-                        ),
-                        parts=parts,
-                    )
-                ),
-            )
+        return SemanticModelDefinitionResponse(
+            workspace_id=workspace_id,
+            semantic_model_id=(semantic_model_id),
+            definition=(
+                SemanticModelDefinition(
+                    format=(definition_format),
+                    parts=parts,
+                )
+            ),
         )
 
     def _get_retry_after(
         self,
         response: httpx.Response,
     ) -> int:
-        raw_retry_after = (
-            response.headers.get(
-                "Retry-After"
-            )
-        )
+        raw_retry_after = response.headers.get("Retry-After")
 
         if raw_retry_after is None:
-            return (
-                self.DEFAULT_RETRY_AFTER_SECONDS
-            )
+            return self.DEFAULT_RETRY_AFTER_SECONDS
 
         try:
-            retry_after = int(
-                raw_retry_after
-            )
+            retry_after = int(raw_retry_after)
 
         except ValueError:
-            return (
-                self.DEFAULT_RETRY_AFTER_SECONDS
-            )
+            return self.DEFAULT_RETRY_AFTER_SECONDS
 
         if retry_after < 1:
-            return (
-                self.DEFAULT_RETRY_AFTER_SECONDS
-            )
+            return self.DEFAULT_RETRY_AFTER_SECONDS
 
         return retry_after
 
@@ -389,47 +270,28 @@ class SemanticModelDefinitionService:
         access_token: str,
         definition_format: str = "TMDL",
     ) -> SemanticModelDefinitionResponse:
-        response = (
-            await self.client
-            .start_semantic_model_definition(
-                workspace_id=workspace_id,
-                semantic_model_id=(
-                    semantic_model_id
-                ),
-                access_token=access_token,
-                definition_format=(
-                    definition_format
-                ),
-            )
+        response = await self.client.start_semantic_model_definition(
+            workspace_id=workspace_id,
+            semantic_model_id=(semantic_model_id),
+            access_token=access_token,
+            definition_format=(definition_format),
         )
 
         if response.status_code == 200:
-            payload = self._parse_object(
-                response
-            )
+            payload = self._parse_object(response)
 
             return self._map_definition(
                 workspace_id=workspace_id,
-                semantic_model_id=(
-                    semantic_model_id
-                ),
+                semantic_model_id=(semantic_model_id),
                 payload=payload,
             )
 
         if response.status_code == 202:
-            return await (
-                self._wait_for_definition(
-                    workspace_id=workspace_id,
-                    semantic_model_id=(
-                        semantic_model_id
-                    ),
-                    access_token=(
-                        access_token
-                    ),
-                    initial_response=response,
-                )
+            return await self._wait_for_definition(
+                workspace_id=workspace_id,
+                semantic_model_id=(semantic_model_id),
+                access_token=(access_token),
+                initial_response=response,
             )
 
-        raise UpstreamInvalidResponseError(
-            "fabric"
-        )
+        raise UpstreamInvalidResponseError("fabric")

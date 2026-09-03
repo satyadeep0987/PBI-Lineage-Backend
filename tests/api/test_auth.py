@@ -19,10 +19,8 @@ from app.services.auth.microsoft_device_auth_service import (
 def _scope_permissions(
     scopes: list[str],
 ) -> list[str]:
-    return [
-        get_scope_permission(scope)
-        for scope in scopes
-    ]
+    return [get_scope_permission(scope) for scope in scopes]
+
 
 def _create_session(
     *,
@@ -49,12 +47,8 @@ def _create_session(
     session.error_message = error_message
     session.powerbi_error_code = powerbi_error_code
     session.fabric_error_code = fabric_error_code
-    session.powerbi_granted_scopes = list(
-        powerbi_granted_scopes or []
-    )
-    session.fabric_granted_scopes = list(
-        fabric_granted_scopes or []
-    )
+    session.powerbi_granted_scopes = list(powerbi_granted_scopes or [])
+    session.fabric_granted_scopes = list(fabric_granted_scopes or [])
 
     save_device_session(
         session_id,
@@ -77,9 +71,7 @@ def test_microsoft_device_start_success(
         return (
             "test-session-id",
             {
-                "verification_uri": (
-                    "https://microsoft.com/devicelogin"
-                ),
+                "verification_uri": ("https://microsoft.com/devicelogin"),
                 "user_code": "TEST-CODE",
                 "message": "Authenticate with Microsoft.",
                 "expires_in": 900,
@@ -110,12 +102,7 @@ def test_microsoft_device_start_success(
     assert payload["user_code"] == "TEST-CODE"
     assert payload["expires_in"] == 900
 
-    assert (
-        response.cookies.get(
-            AUTH_SESSION_COOKIE
-        )
-        == "test-session-id"
-    )
+    assert response.cookies.get(AUTH_SESSION_COOKIE) == "test-session-id"
 
     client.cookies.clear()
 
@@ -125,9 +112,7 @@ def test_device_status_requires_session(
 ):
     client.cookies.clear()
 
-    response = client.get(
-        "/api/v1/auth/microsoft/device/status"
-    )
+    response = client.get("/api/v1/auth/microsoft/device/status")
 
     assert response.status_code == 401
 
@@ -147,9 +132,7 @@ def test_device_status_pending(
             session_id,
         )
 
-        response = client.get(
-            "/api/v1/auth/microsoft/device/status"
-        )
+        response = client.get("/api/v1/auth/microsoft/device/status")
 
         assert response.status_code == 200
 
@@ -169,12 +152,8 @@ def test_device_status_authenticated(
         status="authenticated",
         powerbi_connected=True,
         fabric_connected=True,
-        powerbi_granted_scopes=(
-            _scope_permissions(POWERBI_SCOPES)
-        ),
-        fabric_granted_scopes=(
-            _scope_permissions(FABRIC_SCOPES)
-        ),
+        powerbi_granted_scopes=(_scope_permissions(POWERBI_SCOPES)),
+        fabric_granted_scopes=(_scope_permissions(FABRIC_SCOPES)),
     )
 
     try:
@@ -185,9 +164,7 @@ def test_device_status_authenticated(
             session_id,
         )
 
-        response = client.get(
-            "/api/v1/auth/microsoft/device/status"
-        )
+        response = client.get("/api/v1/auth/microsoft/device/status")
 
         assert response.status_code == 200
 
@@ -195,36 +172,19 @@ def test_device_status_authenticated(
 
         assert payload["status"] == "authenticated"
 
-        assert (
-            payload["powerbi"]["connected"]
-            is True
-        )
+        assert payload["powerbi"]["connected"] is True
 
-        assert (
-            payload["fabric"]["connected"]
-            is True
-        )
+        assert payload["fabric"]["connected"] is True
 
-        assert (
-            payload["powerbi"]["requested_scopes"]
-            == POWERBI_SCOPES
-        )
-        assert (
-            payload["powerbi"]["missing_scopes"]
-            == []
-        )
-        assert (
-            payload["fabric"]["requested_scopes"]
-            == FABRIC_SCOPES
-        )
-        assert (
-            payload["fabric"]["missing_scopes"]
-            == []
-        )
+        assert payload["powerbi"]["requested_scopes"] == POWERBI_SCOPES
+        assert payload["powerbi"]["missing_scopes"] == []
+        assert payload["fabric"]["requested_scopes"] == FABRIC_SCOPES
+        assert payload["fabric"]["missing_scopes"] == []
 
     finally:
         delete_device_session(session_id)
         client.cookies.clear()
+
 
 def test_device_status_by_session_id_includes_scope_details(
     client,
@@ -233,42 +193,27 @@ def test_device_status_by_session_id_includes_scope_details(
         status="authenticated",
         powerbi_connected=True,
         fabric_connected=False,
-        powerbi_granted_scopes=(
-            _scope_permissions(POWERBI_SCOPES)
-        ),
+        powerbi_granted_scopes=(_scope_permissions(POWERBI_SCOPES)),
         fabric_error_code="interaction_required",
     )
 
     try:
-        response = client.get(
-            
-                "/api/v1/auth/microsoft/device/"
-                f"{session_id}/status"
-            
-        )
+        response = client.get(f"/api/v1/auth/microsoft/device/{session_id}/status")
 
         assert response.status_code == 200
 
         payload = response.json()
 
         assert payload["status"] == "authenticated"
-        assert (
-            payload["powerbi"]["missing_scopes"]
-            == []
-        )
-        assert (
-            payload["fabric"]["connected"]
-            is False
-        )
-        assert (
-            payload["fabric"]["error_code"]
-            == "interaction_required"
-        )
+        assert payload["powerbi"]["missing_scopes"] == []
+        assert payload["fabric"]["connected"] is False
+        assert payload["fabric"]["error_code"] == "interaction_required"
         assert payload["fabric"]["missing_scopes"]
 
     finally:
         delete_device_session(session_id)
         client.cookies.clear()
+
 
 def test_device_status_powerbi_connected_fabric_not_connected(
     client,
@@ -277,12 +222,8 @@ def test_device_status_powerbi_connected_fabric_not_connected(
         status="authenticated",
         powerbi_connected=True,
         fabric_connected=False,
-        powerbi_granted_scopes=(
-            _scope_permissions(POWERBI_SCOPES)
-        ),
-        fabric_granted_scopes=[
-            "Workspace.Read.All"
-        ],
+        powerbi_granted_scopes=(_scope_permissions(POWERBI_SCOPES)),
+        fabric_granted_scopes=["Workspace.Read.All"],
         fabric_error_code="interaction_required",
     )
 
@@ -294,9 +235,7 @@ def test_device_status_powerbi_connected_fabric_not_connected(
             session_id,
         )
 
-        response = client.get(
-            "/api/v1/auth/microsoft/device/status"
-        )
+        response = client.get("/api/v1/auth/microsoft/device/status")
 
         assert response.status_code == 200
 
@@ -304,28 +243,15 @@ def test_device_status_powerbi_connected_fabric_not_connected(
 
         assert payload["status"] == "authenticated"
 
-        assert (
-            payload["powerbi"]["connected"]
-            is True
-        )
+        assert payload["powerbi"]["connected"] is True
 
-        assert (
-            payload["fabric"]["connected"]
-            is False
-        )
+        assert payload["fabric"]["connected"] is False
 
-        assert (
-            payload["fabric"]["error_code"]
-            == "interaction_required"
-        )
-        assert (
-            payload["fabric"]["granted_scopes"]
-            == ["Workspace.Read.All"]
-        )
+        assert payload["fabric"]["error_code"] == "interaction_required"
+        assert payload["fabric"]["granted_scopes"] == ["Workspace.Read.All"]
         assert (
             "https://api.fabric.microsoft.com/"
-            "Item.ReadWrite.All"
-            in payload["fabric"]["missing_scopes"]
+            "Item.ReadWrite.All" in payload["fabric"]["missing_scopes"]
         )
 
     finally:
@@ -351,9 +277,7 @@ def test_device_status_failed(
             session_id,
         )
 
-        response = client.get(
-            "/api/v1/auth/microsoft/device/status"
-        )
+        response = client.get("/api/v1/auth/microsoft/device/status")
 
         assert response.status_code == 200
 
@@ -361,10 +285,7 @@ def test_device_status_failed(
 
         assert payload["status"] == "failed"
 
-        assert (
-            payload["message"]
-            == "Authentication failed."
-        )
+        assert payload["message"] == "Authentication failed."
 
     finally:
         delete_device_session(session_id)
@@ -387,9 +308,7 @@ def test_logout_success(
         session_id,
     )
 
-    response = client.post(
-        "/api/v1/auth/microsoft/device/logout"
-    )
+    response = client.post("/api/v1/auth/microsoft/device/logout")
 
     assert response.status_code == 200
 
@@ -416,7 +335,4 @@ def test_request_id_propagation(
 
     assert response.status_code == 401
 
-    assert (
-        response.headers["X-Request-ID"]
-        == request_id
-    )
+    assert response.headers["X-Request-ID"] == request_id

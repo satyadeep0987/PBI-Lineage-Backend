@@ -139,9 +139,6 @@ async def test_get_gateway_datasources_uses_gateway_collection_url(
     assert result[0]["id"] == "datasource-1"
     provider_get.assert_awaited_once_with(
         provider="powerbi",
-        url=(
-            "https://api.powerbi.com/v1.0/myorg/"
-            "gateways/gateway-1/datasources"
-        ),
+        url=("https://api.powerbi.com/v1.0/myorg/gateways/gateway-1/datasources"),
         access_token="fake-token",
     )

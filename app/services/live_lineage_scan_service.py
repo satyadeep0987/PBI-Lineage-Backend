@@ -39,8 +39,7 @@ class LiveLineageScanService:
         if request.report_id:
             report_task = self.report_definition_service.get_normalized_definition(
                 workspace_id=(
-                    request.report_workspace_id
-                    or request.semantic_model_workspace_id
+                    request.report_workspace_id or request.semantic_model_workspace_id
                 ),
                 report_id=request.report_id,
                 access_token=fabric_access_token,

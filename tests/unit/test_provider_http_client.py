@@ -15,18 +15,13 @@ def test_provider_error_detail_from_nested_payload():
         {
             "error": {
                 "errorCode": "InvalidFormat",
-                "message": (
-                    "The requested format is invalid."
-                ),
+                "message": ("The requested format is invalid."),
             }
         },
         status_code=400,
     )
 
-    assert detail == (
-        "Status 400. InvalidFormat: "
-        "The requested format is invalid."
-    )
+    assert detail == ("Status 400. InvalidFormat: The requested format is invalid.")
 
 
 def test_handle_provider_response_includes_provider_error_detail():
@@ -35,16 +30,12 @@ def test_handle_provider_response_includes_provider_error_detail():
         json={
             "error": {
                 "errorCode": "InvalidFormat",
-                "message": (
-                    "Report format TMDL is invalid."
-                ),
+                "message": ("Report format TMDL is invalid."),
             }
         },
     )
 
-    with pytest.raises(
-        UpstreamRequestError
-    ) as exc_info:
+    with pytest.raises(UpstreamRequestError) as exc_info:
         _handle_provider_response(
             response=response,
             provider="fabric",

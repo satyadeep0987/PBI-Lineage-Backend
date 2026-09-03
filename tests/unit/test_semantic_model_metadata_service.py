@@ -74,37 +74,27 @@ def _definition_response() -> ParsedSemanticModelResponse:
                 columns=[
                     ParsedSemanticModelColumn(
                         name="Amount",
-                        source_path=(
-                            "definition/tables/Sales.tmdl"
-                        ),
+                        source_path=("definition/tables/Sales.tmdl"),
                     ),
                     ParsedSemanticModelColumn(
                         name="Budget",
-                        source_path=(
-                            "definition/tables/Sales.tmdl"
-                        ),
+                        source_path=("definition/tables/Sales.tmdl"),
                     ),
                 ],
                 measures=[
                     ParsedSemanticModelMeasure(
                         name="Total Sales",
-                        source_path=(
-                            "definition/tables/Sales.tmdl"
-                        ),
+                        source_path=("definition/tables/Sales.tmdl"),
                     )
                 ],
                 hierarchies=[
                     ParsedSemanticModelHierarchy(
                         name="Calendar",
-                        source_path=(
-                            "definition/tables/Sales.tmdl"
-                        ),
+                        source_path=("definition/tables/Sales.tmdl"),
                         levels=[
                             ParsedSemanticModelHierarchyLevel(
                                 name="Year",
-                                source_path=(
-                                    "definition/tables/Sales.tmdl"
-                                ),
+                                source_path=("definition/tables/Sales.tmdl"),
                             )
                         ],
                     )
@@ -130,10 +120,7 @@ def _xmla_response(
     return XmlaSemanticModelMetadataResponse(
         workspace_id=WORKSPACE_ID,
         semantic_model_id=semantic_model_id,
-        xmla_endpoint=(
-            "powerbi://api.powerbi.com/v1.0/"
-            "myorg/Sales%20Workspace"
-        ),
+        xmla_endpoint=("powerbi://api.powerbi.com/v1.0/myorg/Sales%20Workspace"),
         database_name="Sales Model",
         table_count=1,
         column_count=2,
@@ -160,18 +147,10 @@ def _xmla_response(
                 hierarchies=[
                     XmlaSemanticModelHierarchy(
                         name="Calendar",
-                        levels=[
-                            XmlaSemanticModelHierarchyLevel(
-                                name="Year"
-                            )
-                        ],
+                        levels=[XmlaSemanticModelHierarchyLevel(name="Year")],
                     )
                 ],
-                partitions=[
-                    XmlaSemanticModelPartition(
-                        name="Sales"
-                    )
-                ],
+                partitions=[XmlaSemanticModelPartition(name="Sales")],
             )
         ],
         relationships=[
@@ -188,12 +167,8 @@ def _xmla_response(
 
 @pytest.mark.asyncio
 async def test_get_metadata_preserves_sources_and_reconciles_objects():
-    definition_service = _FakeDefinitionService(
-        _definition_response()
-    )
-    xmla_metadata_service = _FakeXmlaMetadataService(
-        _xmla_response()
-    )
+    definition_service = _FakeDefinitionService(_definition_response())
+    xmla_metadata_service = _FakeXmlaMetadataService(_xmla_response())
     service = SemanticModelMetadataService(
         definition_service=definition_service,
         xmla_metadata_service=xmla_metadata_service,
@@ -245,9 +220,7 @@ async def test_get_metadata_preserves_sources_and_reconciles_objects():
 @pytest.mark.asyncio
 async def test_get_metadata_rejects_mismatched_xmla_identity():
     service = SemanticModelMetadataService(
-        definition_service=_FakeDefinitionService(
-            _definition_response()
-        ),
+        definition_service=_FakeDefinitionService(_definition_response()),
         xmla_metadata_service=_FakeXmlaMetadataService(
             _xmla_response(
                 semantic_model_id="different-model",

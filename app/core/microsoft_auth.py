@@ -3,25 +3,15 @@ import binascii
 import json
 from typing import Any
 
-MICROSOFT_LOGIN_BASE_URL = (
-    "https://login.microsoftonline.com"
-)
+MICROSOFT_LOGIN_BASE_URL = "https://login.microsoftonline.com"
 
-POWERBI_RESOURCE = (
-    "https://analysis.windows.net/powerbi/api"
-)
+POWERBI_RESOURCE = "https://analysis.windows.net/powerbi/api"
 
-FABRIC_RESOURCE = (
-    "https://api.fabric.microsoft.com"
-)
+FABRIC_RESOURCE = "https://api.fabric.microsoft.com"
 
-POWERBI_APPLICATION_SCOPE = (
-    f"{POWERBI_RESOURCE}/.default"
-)
+POWERBI_APPLICATION_SCOPE = f"{POWERBI_RESOURCE}/.default"
 
-FABRIC_APPLICATION_SCOPE = (
-    f"{FABRIC_RESOURCE}/.default"
-)
+FABRIC_APPLICATION_SCOPE = f"{FABRIC_RESOURCE}/.default"
 
 POWERBI_SCOPES = [
     f"{POWERBI_RESOURCE}/Workspace.Read.All",
@@ -35,10 +25,7 @@ FABRIC_SCOPES = [
 ]
 
 MICROSOFT_TEST_SCOPES = [
-    (
-        "https://analysis.windows.net/"
-        "powerbi/api/Workspace.Read.All"
-    ),
+    ("https://analysis.windows.net/powerbi/api/Workspace.Read.All"),
 ]
 
 
@@ -61,9 +48,7 @@ def normalize_scope_permissions(
         if not isinstance(scope, str):
             continue
 
-        permission = get_scope_permission(
-            scope
-        )
+        permission = get_scope_permission(scope)
 
         if not permission or permission in seen:
             continue
@@ -84,23 +69,12 @@ def _decode_unverified_jwt_payload(
 
     encoded_payload = parts[1]
 
-    padded_payload = (
-        encoded_payload
-        + "="
-        * (
-            (4 - len(encoded_payload) % 4)
-            % 4
-        )
-    )
+    padded_payload = encoded_payload + "=" * ((4 - len(encoded_payload) % 4) % 4)
 
     try:
-        decoded = base64.urlsafe_b64decode(
-            padded_payload.encode("ascii")
-        )
+        decoded = base64.urlsafe_b64decode(padded_payload.encode("ascii"))
 
-        payload = json.loads(
-            decoded.decode("utf-8")
-        )
+        payload = json.loads(decoded.decode("utf-8"))
 
     except (
         binascii.Error,
@@ -124,35 +98,21 @@ def extract_granted_scopes(
     raw_scope = token_result.get("scope")
 
     if isinstance(raw_scope, str):
-        scope_values.extend(
-            raw_scope.split()
-        )
+        scope_values.extend(raw_scope.split())
 
-    access_token = token_result.get(
-        "access_token"
-    )
+    access_token = token_result.get("access_token")
 
     if isinstance(access_token, str):
-        payload = _decode_unverified_jwt_payload(
-            access_token
-        )
+        payload = _decode_unverified_jwt_payload(access_token)
 
         raw_scp = payload.get("scp")
 
         if isinstance(raw_scp, str):
-            scope_values.extend(
-                raw_scp.split()
-            )
+            scope_values.extend(raw_scp.split())
 
         raw_roles = payload.get("roles")
 
         if isinstance(raw_roles, list):
-            scope_values.extend(
-                role
-                for role in raw_roles
-                if isinstance(role, str)
-            )
+            scope_values.extend(role for role in raw_roles if isinstance(role, str))
 
-    return normalize_scope_permissions(
-        scope_values
-    )
+    return normalize_scope_permissions(scope_values)

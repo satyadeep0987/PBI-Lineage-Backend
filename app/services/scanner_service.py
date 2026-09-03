@@ -36,9 +36,7 @@ class ScannerService:
             if modified_since.tzinfo is None:
                 modified_since = modified_since.replace(tzinfo=UTC)
             normalized_since = (
-                modified_since.astimezone(UTC)
-                .isoformat()
-                .replace("+00:00", "Z")
+                modified_since.astimezone(UTC).isoformat().replace("+00:00", "Z")
             )
 
         raw_workspaces = await self.client.get_modified_workspaces(
@@ -157,9 +155,7 @@ class ScannerService:
         summary = ScannerResultSummary(
             workspace_count=len(workspaces),
             datasource_instance_count=len(datasource_instances),
-            misconfigured_datasource_instance_count=(
-                len(misconfigured_instances)
-            ),
+            misconfigured_datasource_instance_count=(len(misconfigured_instances)),
         )
 
         for workspace in workspaces:
@@ -180,19 +176,13 @@ class ScannerService:
                 summary.relationship_count += len(
                     cls._list(semantic_model, "relationships")
                 )
-                summary.role_count += len(
-                    cls._list(semantic_model, "roles")
-                )
+                summary.role_count += len(cls._list(semantic_model, "roles"))
                 summary.dataset_expression_count += len(
                     cls._list(semantic_model, "expressions")
                 )
                 for table in tables:
-                    summary.column_count += len(
-                        cls._list(table, "columns")
-                    )
-                    summary.measure_count += len(
-                        cls._list(table, "measures")
-                    )
+                    summary.column_count += len(cls._list(table, "columns"))
+                    summary.measure_count += len(cls._list(table, "measures"))
                     summary.table_source_expression_count += len(
                         cls._list(table, "source")
                     )

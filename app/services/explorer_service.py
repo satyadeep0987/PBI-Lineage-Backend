@@ -108,9 +108,7 @@ class ExplorerService:
         semantic_model_definition_service: (
             SemanticModelDefinitionService | None
         ) = None,
-        report_semantic_lineage_service: (
-            ReportSemanticLineageService | None
-        ) = None,
+        report_semantic_lineage_service: (ReportSemanticLineageService | None) = None,
         gateway_service: GatewayService | None = None,
         max_concurrency: int = 8,
     ) -> None:
@@ -123,8 +121,7 @@ class ExplorerService:
             report_definition_service or ReportDefinitionService()
         )
         self.semantic_model_definition_service = (
-            semantic_model_definition_service
-            or SemanticModelDefinitionService()
+            semantic_model_definition_service or SemanticModelDefinitionService()
         )
         self.report_semantic_lineage_service = (
             report_semantic_lineage_service or ReportSemanticLineageService()
@@ -229,8 +226,7 @@ class ExplorerService:
                     continue
                 model_key = (
                     str(
-                        selection.semantic_model_workspace_id
-                        or selection.workspace_id
+                        selection.semantic_model_workspace_id or selection.workspace_id
                     ),
                     str(selection.semantic_model_id),
                 )
@@ -238,8 +234,7 @@ class ExplorerService:
                     semantic_model_tasks[model_key] = asyncio.create_task(
                         bounded(
                             lambda model_key=model_key: (
-                                self.semantic_model_definition_service
-                                .get_parsed_definition(
+                                self.semantic_model_definition_service.get_parsed_definition(
                                     workspace_id=model_key[0],
                                     semantic_model_id=model_key[1],
                                     access_token=fabric_access_token,
@@ -280,10 +275,7 @@ class ExplorerService:
                 report_definition,
             )
             semantic_model_workspace_id = (
-                str(
-                    selection.semantic_model_workspace_id
-                    or selection.workspace_id
-                )
+                str(selection.semantic_model_workspace_id or selection.workspace_id)
                 if semantic_model_id
                 else None
             )
@@ -307,8 +299,7 @@ class ExplorerService:
                 semantic_model_tasks[model_key] = asyncio.create_task(
                     bounded(
                         lambda model_key=model_key: (
-                            self.semantic_model_definition_service
-                            .get_parsed_definition(
+                            self.semantic_model_definition_service.get_parsed_definition(
                                 workspace_id=model_key[0],
                                 semantic_model_id=model_key[1],
                                 access_token=fabric_access_token,
@@ -344,9 +335,7 @@ class ExplorerService:
                     selection=selection,
                     workspace=workspace_tasks[report_key[0]].result(),
                     report=report_tasks[report_key].result(),
-                    semantic_model_workspace_id=(
-                        model_key[0] if model_key else None
-                    ),
+                    semantic_model_workspace_id=(model_key[0] if model_key else None),
                     semantic_model_id=model_key[1] if model_key else None,
                     report_definition=(
                         report_definition_tasks[report_key].result()
@@ -361,9 +350,7 @@ class ExplorerService:
                 )
             )
 
-        physical_by_model: dict[
-            tuple[str, str], PhysicalSourceDiscoveryResponse
-        ] = {}
+        physical_by_model: dict[tuple[str, str], PhysicalSourceDiscoveryResponse] = {}
         if needs_physical_sources:
             physical_tasks = {
                 model_key: asyncio.create_task(
@@ -396,9 +383,7 @@ class ExplorerService:
                 for model_key in self._model_keys(evidence)
             }
             await asyncio.gather(*dax_tasks.values())
-            dax_by_model = {
-                key: task.result() for key, task in dax_tasks.items()
-            }
+            dax_by_model = {key: task.result() for key, task in dax_tasks.items()}
 
         lineage_by_report: dict[tuple[str, str], ReportSemanticLineageResponse] = {}
         if VISUAL_SOURCE_LOOKUP in requested:
@@ -451,9 +436,7 @@ class ExplorerService:
             else []
         )
         report_layout_rows = (
-            self._report_layout_rows(evidence)
-            if REPORT_LAYOUT in requested
-            else []
+            self._report_layout_rows(evidence) if REPORT_LAYOUT in requested else []
         )
         visual_rows = (
             self._visual_source_rows(evidence, lineage_by_report)
@@ -511,11 +494,9 @@ class ExplorerService:
         results = await asyncio.gather(
             *(
                 bounded(
-                    lambda gateway_id=gateway.id: (
-                        self.gateway_service.list_datasources(
-                            gateway_id=gateway_id,
-                            access_token=access_token,
-                        )
+                    lambda gateway_id=gateway.id: self.gateway_service.list_datasources(
+                        gateway_id=gateway_id,
+                        access_token=access_token,
                     )
                 )
                 for gateway in gateways.gateways
@@ -569,9 +550,7 @@ class ExplorerService:
     @staticmethod
     def _model_keys(evidence: list[_ReportEvidence]) -> set[tuple[str, str]]:
         return {
-            model_key
-            for item in evidence
-            if (model_key := item.model_key) is not None
+            model_key for item in evidence if (model_key := item.model_key) is not None
         }
 
     @staticmethod
@@ -590,9 +569,7 @@ class ExplorerService:
         self,
         *,
         evidence: list[_ReportEvidence],
-        physical_by_model: dict[
-            tuple[str, str], PhysicalSourceDiscoveryResponse
-        ],
+        physical_by_model: dict[tuple[str, str], PhysicalSourceDiscoveryResponse],
         dax_by_model: dict[tuple[str, str], DaxDependencyAnalysisResponse],
     ) -> list[ExplorerWarning]:
         warnings: list[ExplorerWarning] = []
@@ -696,9 +673,7 @@ class ExplorerService:
     def _source_database_rows(
         self,
         evidence: list[_ReportEvidence],
-        physical_by_model: dict[
-            tuple[str, str], PhysicalSourceDiscoveryResponse
-        ],
+        physical_by_model: dict[tuple[str, str], PhysicalSourceDiscoveryResponse],
     ) -> list[SourceDatabaseLineageRow]:
         rows: list[SourceDatabaseLineageRow] = []
         for item in evidence:
@@ -737,9 +712,7 @@ class ExplorerService:
                                 self._physical_qualified_name(source)
                             ),
                             gateway_id=source.gateway_id,
-                            gateway_datasource_id=(
-                                source.gateway_datasource_id
-                            ),
+                            gateway_datasource_id=(source.gateway_datasource_id),
                         )
                     )
 
@@ -792,9 +765,7 @@ class ExplorerService:
                         **common,
                         semantic_table=table.name,
                         semantic_object_type=(
-                            "calculated_column"
-                            if column.expression
-                            else "column"
+                            "calculated_column" if column.expression else "column"
                         ),
                         semantic_object_name=column.name,
                         semantic_data_type=column.data_type,
@@ -855,9 +826,7 @@ class ExplorerService:
     def _measure_source_rows(
         self,
         evidence: list[_ReportEvidence],
-        physical_by_model: dict[
-            tuple[str, str], PhysicalSourceDiscoveryResponse
-        ],
+        physical_by_model: dict[tuple[str, str], PhysicalSourceDiscoveryResponse],
         dax_by_model: dict[tuple[str, str], DaxDependencyAnalysisResponse],
     ) -> list[MeasureSourceLineageRow]:
         rows: list[MeasureSourceLineageRow] = []
@@ -876,9 +845,7 @@ class ExplorerService:
                         self._measure_source_row(
                             item=item,
                             owner=owner,
-                            expression=expressions.get(
-                                owner.qualified_name.casefold()
-                            ),
+                            expression=expressions.get(owner.qualified_name.casefold()),
                             dependency=None,
                             dependency_depth=None,
                             physical_source=None,
@@ -947,9 +914,7 @@ class ExplorerService:
             semantic_object_type=owner.object_type,
             semantic_object_name=owner.object_name,
             semantic_dax_expression=expression,
-            source_semantic_table=(
-                dependency.table_name if dependency else None
-            ),
+            source_semantic_table=(dependency.table_name if dependency else None),
             source_semantic_object_type=(
                 dependency.object_type if dependency else None
             ),
@@ -967,25 +932,15 @@ class ExplorerService:
                 dependency_depth == 1 if dependency_depth is not None else None
             ),
             source_id=(physical_source.source_id if physical_source else None),
-            source_provider=(
-                physical_source.provider if physical_source else None
-            ),
-            source_server=(
-                physical_source.server if physical_source else None
-            ),
-            source_database=(
-                physical_source.database if physical_source else None
-            ),
-            source_schema=(
-                physical_source.schema_name if physical_source else None
-            ),
+            source_provider=(physical_source.provider if physical_source else None),
+            source_server=(physical_source.server if physical_source else None),
+            source_database=(physical_source.database if physical_source else None),
+            source_schema=(physical_source.schema_name if physical_source else None),
             source_object_name=(
                 physical_source.object_name if physical_source else None
             ),
             source_object_type=(
-                self._physical_object_type(physical_source)
-                if physical_source
-                else None
+                self._physical_object_type(physical_source) if physical_source else None
             ),
             source_fully_qualified_name=(
                 self._physical_qualified_name(physical_source)
@@ -1004,14 +959,14 @@ class ExplorerService:
                 expressions[table.name.casefold()] = table.expression
             for column in table.columns:
                 if column.expression:
-                    expressions[
-                        f"{table.name}[{column.name}]".casefold()
-                    ] = column.expression
+                    expressions[f"{table.name}[{column.name}]".casefold()] = (
+                        column.expression
+                    )
             for measure in table.measures:
                 if measure.expression:
-                    expressions[
-                        f"{table.name}[{measure.name}]".casefold()
-                    ] = measure.expression
+                    expressions[f"{table.name}[{measure.name}]".casefold()] = (
+                        measure.expression
+                    )
         return expressions
 
     @staticmethod
@@ -1023,9 +978,7 @@ class ExplorerService:
         for edge in dax.dependencies:
             predecessors[edge.target.qualified_name.casefold()].append(edge.source)
 
-        terminals: dict[
-            tuple[str, str], tuple[DaxObjectReference, int]
-        ] = {}
+        terminals: dict[tuple[str, str], tuple[DaxObjectReference, int]] = {}
 
         def walk(
             current: DaxObjectReference,
@@ -1064,9 +1017,7 @@ class ExplorerService:
         physical: PhysicalSourceDiscoveryResponse,
     ) -> dict[str, list[PhysicalDataSource]]:
         source_by_id = {source.source_id: source for source in physical.sources}
-        sources_by_table: dict[str, dict[str, PhysicalDataSource]] = defaultdict(
-            dict
-        )
+        sources_by_table: dict[str, dict[str, PhysicalDataSource]] = defaultdict(dict)
         for mapping in physical.mappings:
             table_sources = sources_by_table[mapping.semantic_table.casefold()]
             for source_id in mapping.source_ids:
@@ -1109,9 +1060,7 @@ class ExplorerService:
                                 visual_id=visual.id,
                                 visual_name=(visual.title or visual.internal_name),
                                 visual_type=visual.visual_type,
-                                field_usage=(
-                                    reference.usage if reference else None
-                                ),
+                                field_usage=(reference.usage if reference else None),
                                 field_role=reference.role if reference else None,
                                 field_type=(
                                     reference.object_type if reference else None
@@ -1134,12 +1083,8 @@ class ExplorerService:
                                 ),
                                 visual_x=position.x if position else None,
                                 visual_y=position.y if position else None,
-                                visual_width=(
-                                    position.width if position else None
-                                ),
-                                visual_height=(
-                                    position.height if position else None
-                                ),
+                                visual_width=(position.width if position else None),
+                                visual_height=(position.height if position else None),
                             )
                         )
 
@@ -1196,30 +1141,20 @@ class ExplorerService:
                         field_role=reference.role,
                         field_type=reference.object_type,
                         visual_table_name=reference.table_name,
-                        visual_field_name=(
-                            ExplorerService._field_name(reference)
-                        ),
+                        visual_field_name=(ExplorerService._field_name(reference)),
                         aggregation=reference.aggregation_function,
                         query_reference=reference.query_ref,
                         semantic_table=(
-                            semantic_object.table_name
-                            if semantic_object
-                            else None
+                            semantic_object.table_name if semantic_object else None
                         ),
                         semantic_object_name=(
-                            semantic_object.object_name
-                            if semantic_object
-                            else None
+                            semantic_object.object_name if semantic_object else None
                         ),
                         semantic_object_type=(
-                            semantic_object.object_type
-                            if semantic_object
-                            else None
+                            semantic_object.object_type if semantic_object else None
                         ),
                         semantic_object_source_path=(
-                            semantic_object.source_path
-                            if semantic_object
-                            else None
+                            semantic_object.source_path if semantic_object else None
                         ),
                         match_status=match.status,
                         match_confidence=match.match_confidence,

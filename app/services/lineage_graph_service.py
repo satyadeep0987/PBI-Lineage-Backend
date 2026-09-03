@@ -19,8 +19,9 @@ class LineageGraphService:
         self._validate_request_identity(request)
         semantic_model = request.semantic_model
         dax = request.dax_analysis or DaxDependencyService().analyze(semantic_model)
-        physical = request.physical_sources or PhysicalSourceDiscoveryService().discover(
-            semantic_model
+        physical = (
+            request.physical_sources
+            or PhysicalSourceDiscoveryService().discover(semantic_model)
         )
         nodes: dict[str, LineageNode] = {}
         edges: dict[tuple[str, str, str], LineageEdge] = {}
@@ -316,11 +317,17 @@ class LineageGraphService:
                 LineageNode(
                     node_id=source.source_id,
                     node_type="physical_source",
-                    name=source.object_name or source.database or source.path or source.url or source.provider,
+                    name=source.object_name
+                    or source.database
+                    or source.path
+                    or source.url
+                    or source.provider,
                     qualified_name=self._physical_qualified_name(source),
                     workspace_id=model.workspace_id,
                     semantic_model_id=model.semantic_model_id,
-                    properties=source.model_dump(exclude={"source_id"}, exclude_none=True),
+                    properties=source.model_dump(
+                        exclude={"source_id"}, exclude_none=True
+                    ),
                 ),
             )
 
@@ -331,7 +338,9 @@ class LineageGraphService:
                     node_id=mapping.query_id,
                     node_type="query",
                     name=mapping.partition_name,
-                    qualified_name=(f"{mapping.semantic_table}.{mapping.partition_name}"),
+                    qualified_name=(
+                        f"{mapping.semantic_table}.{mapping.partition_name}"
+                    ),
                     workspace_id=model.workspace_id,
                     semantic_model_id=model.semantic_model_id,
                     properties={"source_path": mapping.source_path},
@@ -347,7 +356,9 @@ class LineageGraphService:
                 self._add_edge(edges, mapping.query_id, table_id, "populates", True)
             for source_id in mapping.source_ids:
                 if source_id in nodes:
-                    self._add_edge(edges, source_id, mapping.query_id, "reads_from", True)
+                    self._add_edge(
+                        edges, source_id, mapping.query_id, "reads_from", True
+                    )
 
     def _add_report_nodes(
         self,
@@ -479,8 +490,7 @@ class LineageGraphService:
             )
 
         snowflake_ids = {
-            item.qualified_name.casefold(): item.object_id
-            for item in snapshot.objects
+            item.qualified_name.casefold(): item.object_id for item in snapshot.objects
         }
         for node in list(nodes.values()):
             if node.node_type != "physical_source":
@@ -568,16 +578,22 @@ class LineageGraphService:
 
     @staticmethod
     def _physical_qualified_name(source: Any) -> str:
-        return ".".join(
-            part
-            for part in (
-                source.server,
-                source.database,
-                source.schema_name,
-                source.object_name,
+        return (
+            ".".join(
+                part
+                for part in (
+                    source.server,
+                    source.database,
+                    source.schema_name,
+                    source.object_name,
+                )
+                if part
             )
-            if part
-        ) or source.path or source.url or source.account or source.provider
+            or source.path
+            or source.url
+            or source.account
+            or source.provider
+        )
 
     @staticmethod
     def _add_node(nodes: dict[str, LineageNode], node: LineageNode) -> None:
