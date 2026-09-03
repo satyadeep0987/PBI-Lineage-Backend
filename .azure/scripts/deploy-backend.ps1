@@ -5,6 +5,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$AcrName,
 
+    [Parameter(Mandatory = $true)]
+    [string]$KeyVaultName,
+
     [Parameter(Mandatory = $false)]
     [string]$ContainerName = "pbi-lineage-api",
 
@@ -202,6 +205,26 @@ Write-Host "Authenticating VM managed identity..."
     --identity `
     --output none
 
+Write-Host "Loading backend production secrets..."
+
+$LineageAdminApiKey = & $AzExe keyvault secret show `
+    --vault-name $KeyVaultName `
+    --name "lineage-admin-api-key" `
+    --query value `
+    --output tsv
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to retrieve LINEAGE_ADMIN_API_KEY from Key Vault."
+}
+
+if ([string]::IsNullOrWhiteSpace($LineageAdminApiKey)) {
+    throw "LINEAGE_ADMIN_API_KEY retrieved from Key Vault is empty."
+}
+
+$env:LINEAGE_ADMIN_API_KEY = $LineageAdminApiKey
+
+Write-Host "Backend production secrets loaded successfully."
+
 if ($LASTEXITCODE -ne 0) {
     throw "VM managed identity login failed."
 }
@@ -249,6 +272,7 @@ function Start-BackendContainer {
         --env ENABLE_API_DOCS `
         --env AUTH_COOKIE_SECURE `
         --env AUTH_COOKIE_SAMESITE `
+        --env LINEAGE_ADMIN_API_KEY `
         $TargetImage
 
     if ($LASTEXITCODE -ne 0) {
