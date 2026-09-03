@@ -17,6 +17,89 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# ------------------------------------------------------------
+# Refresh machine PATH
+# Azure Run Command may inherit an old PATH from the VM Agent.
+# ------------------------------------------------------------
+
+$MachinePath = [Environment]::GetEnvironmentVariable(
+    "Path",
+    "Machine"
+)
+
+$UserPath = [Environment]::GetEnvironmentVariable(
+    "Path",
+    "User"
+)
+
+$env:Path = "$MachinePath;$UserPath;$env:Path"
+
+# ------------------------------------------------------------
+# Resolve Docker executable explicitly
+# ------------------------------------------------------------
+
+$DockerCommand = Get-Command `
+    "docker.exe" `
+    -ErrorAction SilentlyContinue
+
+if ($DockerCommand) {
+    $DockerExe = $DockerCommand.Source
+}
+else {
+
+    $DockerCandidates = @(
+        "C:\Program Files\Docker\docker.exe",
+        "C:\Program Files\docker\docker.exe"
+    )
+
+    $DockerExe = $DockerCandidates |
+        Where-Object { Test-Path $_ } |
+        Select-Object -First 1
+}
+
+if (-not $DockerExe) {
+    throw "docker.exe could not be located on the Azure VM."
+}
+
+Write-Host "Docker executable:"
+Write-Host $DockerExe
+
+# ------------------------------------------------------------
+# Resolve Azure CLI explicitly
+# ------------------------------------------------------------
+
+$AzCommand = Get-Command `
+    "az.cmd" `
+    -ErrorAction SilentlyContinue
+
+if (-not $AzCommand) {
+    $AzCommand = Get-Command `
+        "az.exe" `
+        -ErrorAction SilentlyContinue
+}
+
+if ($AzCommand) {
+    $AzExe = $AzCommand.Source
+}
+else {
+
+    $AzCandidates = @(
+        "C:\Program Files\Microsoft SDKs\Azure\CLI2\wbin\az.cmd",
+        "C:\Program Files (x86)\Microsoft SDKs\Azure\CLI2\wbin\az.cmd"
+    )
+
+    $AzExe = $AzCandidates |
+        Where-Object { Test-Path $_ } |
+        Select-Object -First 1
+}
+
+if (-not $AzExe) {
+    throw "Azure CLI could not be located on the Azure VM."
+}
+
+Write-Host "Azure CLI executable:"
+Write-Host $AzExe
+
 Write-Host "========================================="
 Write-Host "PBI Lineage Backend Deployment"
 Write-Host "========================================="
@@ -68,7 +151,42 @@ $env:AUTH_COOKIE_SAMESITE = "lax"
 # Docker
 # ------------------------------------------------------------
 
-docker version
+$DockerService = Get-Service `
+    -Name docker `
+    -ErrorAction SilentlyContinue
+
+if (-not $DockerService) {
+    throw "Docker Windows service was not found."
+}
+
+if ($DockerService.Status -ne "Running") {
+
+    Write-Host "Starting Docker service..."
+
+    Start-Service docker
+}
+
+$DockerReady = $false
+
+for ($Attempt = 1; $Attempt -le 12; $Attempt++) {
+
+    Write-Host "Docker readiness attempt $Attempt/12"
+
+    & $DockerExe info *> $null
+
+    if ($LASTEXITCODE -eq 0) {
+        $DockerReady = $true
+        break
+    }
+
+    Start-Sleep -Seconds 5
+}
+
+if (-not $DockerReady) {
+    throw "Docker daemon did not become ready."
+}
+
+& $DockerExe version
 
 if ($LASTEXITCODE -ne 0) {
     throw "Docker is not available."
@@ -99,7 +217,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Pulling image..."
 
-docker pull $Image
+& $DockerExe pull $Image
 
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to pull backend image."
@@ -115,7 +233,7 @@ function Start-BackendContainer {
         [string]$TargetImage
     )
 
-    docker run `
+    & $DockerExe run `
         --detach `
         --name $ContainerName `
         --restart unless-stopped `
