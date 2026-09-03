@@ -139,6 +139,7 @@ jobs:
         run: |
           docker build `
             --pull `
+            --build-arg "MSOLAP_MSI_URL=$env:MSOLAP_MSI_URL" `
             --tag $env:TEST_IMAGE `
             .
 
