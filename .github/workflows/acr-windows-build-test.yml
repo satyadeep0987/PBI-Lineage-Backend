@@ -125,6 +125,15 @@ jobs:
               throw "Failed to pull servercore:ltsc2025."
           }
 
+      - name: Validate MSOLAP build configuration
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:MSOLAP_MSI_URL)) {
+              throw "GitHub production variable MSOLAP_MSI_URL is missing."
+          }
+
+          Write-Host "MSOLAP build configuration is available."
+
       - name: Build backend Windows image
         shell: pwsh
         run: |
