@@ -44,11 +44,14 @@ jobs:
     env:
       ACR_NAME: ${{ vars.ACR_NAME }}
       ACR_REPOSITORY: ${{ vars.ACR_REPOSITORY }}
+
       AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
       AZURE_VM_NAME: ${{ vars.AZURE_VM_NAME }}
+
       BACKEND_CONTAINER_NAME: ${{ vars.BACKEND_CONTAINER_NAME }}
       BACKEND_HOST_PORT: ${{ vars.BACKEND_HOST_PORT }}
       BACKEND_CONTAINER_PORT: ${{ vars.BACKEND_CONTAINER_PORT }}
+
       MSOLAP_MSI_URL: ${{ vars.MSOLAP_MSI_URL }}
 
     steps:
@@ -71,8 +74,6 @@ jobs:
               -Encoding utf8 `
               -Append
 
-          Write-Host "Release SHA: $sha"
-
       - name: Checkout release
         uses: actions/checkout@v4
         with:
@@ -85,7 +86,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Verify Windows container runtime
+      - name: Validate Windows Docker
         shell: pwsh
         run: |
           docker version
@@ -93,47 +94,70 @@ jobs:
           $osType = docker info `
               --format '{{.OSType}}'
 
-          Write-Host "Docker OS type: $osType"
-
           if ($osType -ne "windows") {
-              throw (
-                  "Windows Docker daemon is required. " +
-                  "Detected: $osType"
-              )
+              throw "Windows Docker daemon required."
           }
 
-      - name: Login to Azure Container Registry
+      - name: Resolve ACR login server
+        shell: pwsh
+        run: |
+          $loginServer = az acr show `
+              --name $env:ACR_NAME `
+              --query loginServer `
+              --output tsv
+
+          if ([string]::IsNullOrWhiteSpace($loginServer)) {
+              throw "Unable to resolve ACR login server."
+          }
+
+          "ACR_LOGIN_SERVER=$loginServer" | Out-File `
+              -FilePath $env:GITHUB_ENV `
+              -Encoding utf8 `
+              -Append
+
+      - name: Login to ACR
         shell: pwsh
         run: |
           az acr login `
               --name $env:ACR_NAME
 
           if ($LASTEXITCODE -ne 0) {
-              throw "Azure Container Registry login failed."
+              throw "ACR login failed."
           }
 
       - name: Calculate image name
         shell: pwsh
         run: |
-          $loginServer = "$($env:ACR_NAME).azurecr.io"
-
           $image = "{0}/{1}:{2}" -f `
-              $loginServer,
+              $env:ACR_LOGIN_SERVER,
               $env:ACR_REPOSITORY,
               $env:RELEASE_SHA
-
-          Write-Host "Image: $image"
 
           "BACKEND_IMAGE=$image" | Out-File `
               -FilePath $env:GITHUB_ENV `
               -Encoding utf8 `
               -Append
 
-      - name: Build Windows backend image
+          Write-Host "Image: $image"
+
+      - name: Validate MSOLAP configuration
+        shell: pwsh
+        run: |
+          if (
+              [string]::IsNullOrWhiteSpace(
+                  $env:MSOLAP_MSI_URL
+              )
+          ) {
+              throw "MSOLAP_MSI_URL is missing."
+          }
+
+      - name: Build backend image
         shell: pwsh
         run: |
           docker build `
               --pull `
+              --build-arg `
+                "MSOLAP_MSI_URL=$env:MSOLAP_MSI_URL" `
               --tag $env:BACKEND_IMAGE `
               .
 
@@ -141,22 +165,10 @@ jobs:
               throw "Backend Docker build failed."
           }
 
-      - name: Inspect built image
-        shell: pwsh
-        run: |
-          docker image inspect `
-              $env:BACKEND_IMAGE `
-              | Out-Null
-
-          if ($LASTEXITCODE -ne 0) {
-              throw "Built image could not be inspected."
-          }
-
       - name: Push backend image
         shell: pwsh
         run: |
-          docker push `
-              $env:BACKEND_IMAGE
+          docker push $env:BACKEND_IMAGE
 
           if ($LASTEXITCODE -ne 0) {
               throw "Backend image push failed."
@@ -165,25 +177,63 @@ jobs:
       - name: Deploy backend to Azure VM
         shell: pwsh
         run: |
-          az vm run-command invoke `
+          $output = az vm run-command invoke `
               --resource-group $env:AZURE_RESOURCE_GROUP `
               --name $env:AZURE_VM_NAME `
               --command-id RunPowerShellScript `
               --scripts "@.azure/scripts/deploy-backend.ps1" `
               --parameters `
                   "Image=$env:BACKEND_IMAGE" `
+                  "AcrName=$env:ACR_NAME" `
                   "ContainerName=$env:BACKEND_CONTAINER_NAME" `
                   "HostPort=$env:BACKEND_HOST_PORT" `
-                  "ContainerPort=$env:BACKEND_CONTAINER_PORT"
+                  "ContainerPort=$env:BACKEND_CONTAINER_PORT" `
+              --query "value[].message" `
+              --output tsv
 
-          if ($LASTEXITCODE -ne 0) {
-              throw "Backend VM deployment failed."
+          $output | Write-Host
+
+          $combined = $output -join "`n"
+
+          if (
+              $combined -notmatch
+              "DEPLOYMENT_RESULT=SUCCESS"
+          ) {
+              throw (
+                  "VM deployment did not return " +
+                  "the success marker."
+              )
+          }
+
+      - name: Public backend smoke test
+        shell: pwsh
+        run: |
+          $live = Invoke-WebRequest `
+              -Uri (
+                  "https://lvpowerbilineage.com" +
+                  "/api/v1/health/live"
+              ) `
+              -UseBasicParsing `
+              -TimeoutSec 30
+
+          $ready = Invoke-WebRequest `
+              -Uri (
+                  "https://lvpowerbilineage.com" +
+                  "/api/v1/health/ready"
+              ) `
+              -UseBasicParsing `
+              -TimeoutSec 30
+
+          if (
+              $live.StatusCode -ne 200 -or
+              $ready.StatusCode -ne 200
+          ) {
+              throw "Public backend smoke test failed."
           }
 
       - name: Deployment summary
         shell: pwsh
         run: |
-          Write-Host ""
-          Write-Host "Backend deployment completed."
+          Write-Host "Backend deployment successful."
           Write-Host "Release: $env:RELEASE_SHA"
           Write-Host "Image:   $env:BACKEND_IMAGE"
