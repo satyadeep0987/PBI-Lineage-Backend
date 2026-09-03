@@ -198,7 +198,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Authenticating VM managed identity..."
 
-az login `
+& $AzExe login `
     --identity `
     --output none
 
@@ -208,7 +208,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Authenticating to ACR..."
 
-az acr login `
+& $AzExe acr login `
     --name $AcrName
 
 if ($LASTEXITCODE -ne 0) {
@@ -308,21 +308,21 @@ function Test-BackendHealth {
 
 $PreviousImage = $null
 
-$ExistingContainer = docker ps `
+$ExistingContainer = & $DockerExe ps `
     -a `
     --filter "name=^/$ContainerName$" `
     --format "{{.ID}}"
 
 if ($ExistingContainer) {
 
-    $PreviousImage = docker inspect `
+    $PreviousImage = & $DockerExe inspect `
         --format "{{.Config.Image}}" `
         $ContainerName
 
     Write-Host "Previous image:"
     Write-Host $PreviousImage
 
-    docker rm `
+    & $DockerExe rm `
         --force `
         $ContainerName
 }
@@ -351,12 +351,12 @@ catch {
     Write-Host ""
     Write-Host "New backend deployment failed."
 
-    docker logs `
+    & $DockerExe logs `
         --tail 200 `
         $ContainerName `
         2>$null
 
-    docker rm `
+    & $DockerExe rm `
         --force `
         $ContainerName `
         2>$null
