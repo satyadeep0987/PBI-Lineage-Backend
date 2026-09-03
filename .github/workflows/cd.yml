@@ -86,17 +86,68 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Validate Windows Docker
+      - name: Ensure Windows Docker daemon is ready
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+
+          Write-Host "Checking Docker service..."
+
+          $dockerService = Get-Service `
+              -Name docker `
+              -ErrorAction SilentlyContinue
+
+          if (-not $dockerService) {
+              throw "Docker service is not installed on this runner."
+          }
+
+          Write-Host "Initial Docker service state: $($dockerService.Status)"
+
+          # GitHub-hosted Windows runners currently have an intermittent
+          # Docker/HNS initialization issue. Restarting the service is the
+          # recommended workaround.
+          Write-Host "Restarting Docker service..."
+
+          Restart-Service `
+              -Name docker `
+              -Force
+
+          $maxAttempts = 12
+          $ready = $false
+
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+
+              Write-Host "Docker readiness attempt $attempt/$maxAttempts"
+
+              docker info *> $null
+
+              if ($LASTEXITCODE -eq 0) {
+                  $ready = $true
+                  break
+              }
+
+              Start-Sleep -Seconds 5
+          }
+
+          if (-not $ready) {
+              Write-Host "Docker service details:"
+              Get-Service docker | Format-List *
+
+              throw "Docker daemon did not become ready."
+          }
+
           docker version
 
           $osType = docker info `
               --format '{{.OSType}}'
 
+          Write-Host "Docker OS type: $osType"
+
           if ($osType -ne "windows") {
-              throw "Windows Docker daemon required."
+              throw "Windows Docker daemon required. Found '$osType'."
           }
+
+          Write-Host "Windows Docker daemon is ready."
 
       - name: Resolve ACR login server
         shell: pwsh
