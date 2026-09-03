@@ -56,7 +56,7 @@ class MetricsRegistry:
                     "# HELP pbi_lineage_http_request_duration_seconds "
                     "HTTP request duration."
                 ),
-                "# TYPE pbi_lineage_http_request_duration_seconds summary"
+                "# TYPE pbi_lineage_http_request_duration_seconds summary",
             ]
         )
         for (method, route), total in sorted(duration_sums.items()):
@@ -78,7 +78,7 @@ class MetricsRegistry:
                 (
                     "pbi_lineage_process_uptime_seconds"
                     "{monotonic() - self.started_at:.3f}"
-                )
+                ),
             ]
         )
         return "\n".join(lines) + "\n"

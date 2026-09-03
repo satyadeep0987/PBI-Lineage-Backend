@@ -219,7 +219,7 @@ class SnowflakeDeepLineageService:
                     (
                         "An already visited Snowflake lineage frontier"
                         "was not queried again."
-                    )
+                    ),
                 )
             )
         if truncated:
