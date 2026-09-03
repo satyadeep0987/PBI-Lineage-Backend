@@ -49,6 +49,7 @@ jobs:
       BACKEND_CONTAINER_NAME: ${{ vars.BACKEND_CONTAINER_NAME }}
       BACKEND_HOST_PORT: ${{ vars.BACKEND_HOST_PORT }}
       BACKEND_CONTAINER_PORT: ${{ vars.BACKEND_CONTAINER_PORT }}
+      MSOLAP_MSI_URL: ${{ vars.MSOLAP_MSI_URL }}
 
     steps:
       - name: Resolve release SHA
