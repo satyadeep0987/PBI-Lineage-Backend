@@ -63,9 +63,9 @@ def test_analyze_extracts_measure_column_and_table_dependencies():
 
 def test_analyze_ignores_comments_and_string_literals():
     model = _model()
-    model.tables[0].measures[0].expression = (
-        'IF(TRUE(), "[Fake Measure]", SUM([Amount])) // [Another Fake]'
-    )
+    model.tables[0].measures[
+        0
+    ].expression = 'IF(TRUE(), "[Fake Measure]", SUM([Amount])) // [Another Fake]'
 
     result = DaxDependencyService().analyze(model)
 

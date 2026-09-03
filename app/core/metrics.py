@@ -52,8 +52,11 @@ class MetricsRegistry:
             )
         lines.extend(
             [
-                "# HELP pbi_lineage_http_request_duration_seconds HTTP request duration.",
-                "# TYPE pbi_lineage_http_request_duration_seconds summary",
+                (
+                    "# HELP pbi_lineage_http_request_duration_seconds "
+                    "HTTP request duration."
+                ),
+                "# TYPE pbi_lineage_http_request_duration_seconds summary"
             ]
         )
         for (method, route), total in sorted(duration_sums.items()):
@@ -72,7 +75,10 @@ class MetricsRegistry:
                 f"pbi_lineage_http_requests_in_progress {in_progress}",
                 "# HELP pbi_lineage_process_uptime_seconds Process uptime.",
                 "# TYPE pbi_lineage_process_uptime_seconds gauge",
-                f"pbi_lineage_process_uptime_seconds {monotonic() - self.started_at:.3f}",
+                (
+                    "pbi_lineage_process_uptime_seconds"
+                    "{monotonic() - self.started_at:.3f}"
+                )
             ]
         )
         return "\n".join(lines) + "\n"

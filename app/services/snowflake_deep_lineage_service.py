@@ -144,7 +144,10 @@ class SnowflakeDeepLineageService:
                         warnings.append(
                             self._warning(
                                 "SNOWFLAKE_LINEAGE_BRANCH_FAILED",
-                                "A non-root Snowflake lineage branch could not be read.",
+                                (
+                                    "A non-root Snowflake lineage branch "
+                                    "could not be read."
+                                ),
                                 item.reference.qualified_name,
                             )
                         )
@@ -213,14 +216,20 @@ class SnowflakeDeepLineageService:
             warnings.append(
                 self._warning(
                     "SNOWFLAKE_LINEAGE_CYCLE_SKIPPED",
-                    "An already visited Snowflake lineage frontier was not queried again.",
+                    (
+                        "An already visited Snowflake lineage frontier"
+                        "was not queried again."
+                    )
                 )
             )
         if truncated:
             warnings.append(
                 self._warning(
                     "SNOWFLAKE_LINEAGE_TRUNCATED",
-                    "The lineage response reached at least one configured safety limit.",
+                    (
+                        "The lineage response reached at least one "
+                        "configured safety limit."
+                    ),
                 )
             )
 

@@ -86,7 +86,8 @@ class PhysicalSourceDiscoveryService:
                     warnings.append(
                         PhysicalSourceWarning(
                             code="POWER_QUERY_SOURCE_NOT_DETECTED",
-                            message="No supported physical source was detected in the partition.",
+                            message= ( "No supported physical source was detected"
+                                      "in the partition."),
                             source_path=partition.source_path,
                         )
                     )
