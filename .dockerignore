@@ -49,11 +49,6 @@ auth-data/
 *.log
 logs/
 
-# Temporary Dockerfiles used during development
-Dockerfile.python-test
-Dockerfile.deps-test
-Dockerfile.app-test
-
 # Misc
 README.md
 /local_fastapi_auth_test/
