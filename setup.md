@@ -1,4 +1,8 @@
-# PBI Lineage Backend — Setup Guide
+# PBI Lineage Backend — Historical Setup Guide
+
+> Historical reference only: this file records the original uv-based
+> bootstrap. The supported project setup now uses Python 3.13, `venv`, and
+> `pip`. Follow `INSTALLATION.md`; do not run the installation commands below.
 
 This document records the initial setup and deployment-ready foundation for the **PBI Lineage Backend** project.
 

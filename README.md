@@ -104,7 +104,7 @@ workflows are complete. No PowerAI endpoint or service is included in this phase
 
 ## Technology Stack
 
-- Python 3.11+
+- Python 3.13
 - FastAPI
 - Pydantic / Pydantic Settings
 - httpx
@@ -112,7 +112,7 @@ workflows are complete. No PowerAI endpoint or service is included in this phase
 - Snowflake Connector for Python
 - Snowpark Python
 - cryptography for in-memory RSA key loading
-- uv
+- Python `venv` and pip
 - pytest / pytest-asyncio
 - ruff
 - Windows Docker Engine / Windows Server Core LTSC 2025
@@ -123,16 +123,23 @@ workflows are complete. No PowerAI endpoint or service is included in this phase
 
 ## Quick Start
 
-Install/sync dependencies:
+For a complete clean-machine installation, including Microsoft/Fabric,
+Power BI Scanner, Windows XMLA/MSOLAP, Snowflake, container, network, security,
+and troubleshooting steps, follow [`INSTALLATION.md`](INSTALLATION.md).
+
+Create and activate the virtual environment, then install dependencies:
 
 ```powershell
-uv sync
+py -3.13 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install --requirement requirements-dev.txt
 ```
 
 Run the development server:
 
 ```powershell
-uv run fastapi dev app/main.py
+fastapi dev app/main.py
 ```
 
 Default local docs:
@@ -144,13 +151,14 @@ http://127.0.0.1:8000/docs
 Run tests:
 
 ```powershell
-uv run pytest
+python -m pytest
 ```
 
 Run linting:
 
 ```powershell
-uv run ruff check .
+ruff check .
+ruff format --check .
 ```
 
 ### Windows Container Deployment
@@ -763,9 +771,21 @@ app/
 tests/
   api/
   unit/
+INSTALLATION.md
+constraints.txt
+requirements.txt
+requirements-dev.txt
 ```
 
 ## File And Folder Purpose
+
+### Dependency files
+
+- `requirements.txt` lists direct production dependencies.
+- `requirements-dev.txt` adds test and lint tooling.
+- `constraints.txt` pins the complete resolved Python 3.13 dependency set used
+  by local environments, CI, and the production image.
+- `pyproject.toml` contains pytest and Ruff configuration only.
 
 ### `app/main.py`
 

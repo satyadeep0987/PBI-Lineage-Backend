@@ -10,9 +10,8 @@ __pycache__
 *.pyo
 *.pyd
 
-# uv / caches
-.uv
-uv-cache
+# Python package caches
+pip-cache
 .pytest_cache
 .mypy_cache
 .ruff_cache
