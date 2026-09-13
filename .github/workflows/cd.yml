@@ -371,74 +371,78 @@ jobs:
       # Public smoke test through Cloudflare -> IIS -> FastAPI
       # ------------------------------------------------------
 
-      - name: Public backend smoke test
+      - name: Verify backend through IIS
         shell: pwsh
         run: |
-          $liveUrl = (
-              "https://lvpowerbilineage.com" +
-              "/api/v1/health/live"
-          )
+          $ErrorActionPreference = "Stop"
 
-          $readyUrl = (
-              "https://lvpowerbilineage.com" +
-              "/api/v1/health/ready"
-          )
+          $script = @'
+          $ErrorActionPreference = "Stop"
 
-          $passed = $false
+          Write-Host "Testing FastAPI directly..."
 
-          for ($attempt = 1; $attempt -le 6; $attempt++) {
+          $live = Invoke-RestMethod `
+              -Uri "http://127.0.0.1:8000/api/v1/health/live" `
+              -TimeoutSec 30
 
-              Write-Host (
-                  "Public smoke test attempt " +
-                  "$attempt/6"
-              )
-
-              try {
-
-                  $live = Invoke-WebRequest `
-                      -Uri $liveUrl `
-                      -UseBasicParsing `
-                      -TimeoutSec 30
-
-                  $ready = Invoke-WebRequest `
-                      -Uri $readyUrl `
-                      -UseBasicParsing `
-                      -TimeoutSec 30
-
-                  Write-Host (
-                      "Live status: " +
-                      $live.StatusCode
-                  )
-
-                  Write-Host (
-                      "Ready status: " +
-                      $ready.StatusCode
-                  )
-
-                  if (
-                      $live.StatusCode -eq 200 -and
-                      $ready.StatusCode -eq 200
-                  ) {
-
-                      $passed = $true
-                      break
-                  }
-              }
-              catch {
-
-                  Write-Host (
-                      "Public smoke test not ready yet."
-                  )
-              }
-
-              Start-Sleep -Seconds 5
+          if ($live.status -ne "alive") {
+              throw "FastAPI live health check failed."
           }
 
-          if (-not $passed) {
-              throw "Public backend smoke test failed."
+          $ready = Invoke-RestMethod `
+              -Uri "http://127.0.0.1:8000/api/v1/health/ready" `
+              -TimeoutSec 30
+
+          if ($ready.status -ne "ready") {
+              throw "FastAPI readiness check failed."
           }
 
-          Write-Host "Public backend smoke test passed."
+          Write-Host "Testing IIS -> ARR -> FastAPI..."
+
+          $headers = @{
+              Host = "lvpowerbilineage.com"
+          }
+
+          $iisLive = Invoke-RestMethod `
+              -Uri "http://127.0.0.1/api/v1/health/live" `
+              -Headers $headers `
+              -TimeoutSec 30
+
+          if ($iisLive.status -ne "alive") {
+              throw "IIS live health check failed."
+          }
+
+          $iisReady = Invoke-RestMethod `
+              -Uri "http://127.0.0.1/api/v1/health/ready" `
+              -Headers $headers `
+              -TimeoutSec 30
+
+          if ($iisReady.status -ne "ready") {
+              throw "IIS readiness check failed."
+          }
+
+          Write-Host "BACKEND_SMOKE_TEST=SUCCESS"
+          '@
+
+          $output = az vm run-command invoke `
+              --resource-group $env:AZURE_RESOURCE_GROUP `
+              --name $env:AZURE_VM_NAME `
+              --command-id RunPowerShellScript `
+              --scripts $script `
+              --query "value[].message" `
+              --output tsv
+
+          $output | Write-Host
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "Backend smoke test Run Command failed."
+          }
+
+          if (($output | Out-String) -notmatch "BACKEND_SMOKE_TEST=SUCCESS") {
+              throw "Backend smoke test did not report success."
+          }
+
+          Write-Host "Backend deployment validation passed."
 
       # ------------------------------------------------------
       # Summary
