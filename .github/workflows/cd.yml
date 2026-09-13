@@ -376,72 +376,119 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          $script = @'
-          $ErrorActionPreference = "Stop"
+          $remoteScript = @'
+          $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
 
-          Write-Host "Testing FastAPI directly..."
+          try {
+              Write-Output "Testing FastAPI directly..."
 
-          $live = Invoke-RestMethod `
-              -Uri "http://127.0.0.1:8000/api/v1/health/live" `
-              -TimeoutSec 30
+              $live = Invoke-RestMethod `
+                  -Uri "http://127.0.0.1:8000/api/v1/health/live" `
+                  -TimeoutSec 30
 
-          if ($live.status -ne "alive") {
-              throw "FastAPI live health check failed."
+              if ($live.status -ne "alive") {
+                  throw "FastAPI live health check failed."
+              }
+
+              Write-Output "FastAPI live check passed."
+
+              $ready = Invoke-RestMethod `
+                  -Uri "http://127.0.0.1:8000/api/v1/health/ready" `
+                  -TimeoutSec 30
+
+              if ($ready.status -ne "ready") {
+                  throw "FastAPI readiness check failed."
+              }
+
+              Write-Output "FastAPI readiness check passed."
+
+              Write-Output "Testing IIS -> ARR -> FastAPI..."
+
+              $headers = @{
+                  Host = "lvpowerbilineage.com"
+              }
+
+              $iisLive = Invoke-RestMethod `
+                  -Uri "http://127.0.0.1/api/v1/health/live" `
+                  -Headers $headers `
+                  -TimeoutSec 30
+
+              if ($iisLive.status -ne "alive") {
+                  throw "IIS live health check failed."
+              }
+
+              Write-Output "IIS live check passed."
+
+              $iisReady = Invoke-RestMethod `
+                  -Uri "http://127.0.0.1/api/v1/health/ready" `
+                  -Headers $headers `
+                  -TimeoutSec 30
+
+              if ($iisReady.status -ne "ready") {
+                  throw "IIS readiness check failed."
+              }
+
+              Write-Output "IIS readiness check passed."
+
+              Write-Output "BACKEND_SMOKE_TEST=SUCCESS"
           }
-
-          $ready = Invoke-RestMethod `
-              -Uri "http://127.0.0.1:8000/api/v1/health/ready" `
-              -TimeoutSec 30
-
-          if ($ready.status -ne "ready") {
-              throw "FastAPI readiness check failed."
+          catch {
+              Write-Error $_
+              exit 1
           }
-
-          Write-Host "Testing IIS -> ARR -> FastAPI..."
-
-          $headers = @{
-              Host = "lvpowerbilineage.com"
-          }
-
-          $iisLive = Invoke-RestMethod `
-              -Uri "http://127.0.0.1/api/v1/health/live" `
-              -Headers $headers `
-              -TimeoutSec 30
-
-          if ($iisLive.status -ne "alive") {
-              throw "IIS live health check failed."
-          }
-
-          $iisReady = Invoke-RestMethod `
-              -Uri "http://127.0.0.1/api/v1/health/ready" `
-              -Headers $headers `
-              -TimeoutSec 30
-
-          if ($iisReady.status -ne "ready") {
-              throw "IIS readiness check failed."
-          }
-
-          Write-Host "BACKEND_SMOKE_TEST=SUCCESS"
           '@
+
+          # Windows PowerShell -EncodedCommand requires UTF-16LE.
+          $bytes = [System.Text.Encoding]::Unicode.GetBytes(
+              $remoteScript
+          )
+
+          $encodedScript = [Convert]::ToBase64String(
+              $bytes
+          )
+
+          $launcher = (
+              "powershell.exe " +
+              "-NoProfile " +
+              "-NonInteractive " +
+              "-EncodedCommand " +
+              $encodedScript
+          )
+
+          Write-Host "Starting backend validation on Azure VM..."
 
           $output = az vm run-command invoke `
               --resource-group $env:AZURE_RESOURCE_GROUP `
               --name $env:AZURE_VM_NAME `
               --command-id RunPowerShellScript `
-              --scripts $script `
+              --scripts $launcher `
               --query "value[].message" `
-              --output tsv
+              --output tsv 2>&1
+
+          $runCommandExitCode = $LASTEXITCODE
 
           $output | Write-Host
 
-          if ($LASTEXITCODE -ne 0) {
-              throw "Backend smoke test Run Command failed."
+          if ($runCommandExitCode -ne 0) {
+              throw (
+                  "Backend verification Run Command failed. " +
+                  "Exit code: $runCommandExitCode"
+              )
           }
 
-          if (($output | Out-String) -notmatch "BACKEND_SMOKE_TEST=SUCCESS") {
+          $combinedOutput = (
+              $output |
+              Out-String
+          )
+
+          if (
+              $combinedOutput -notmatch
+              "BACKEND_SMOKE_TEST=SUCCESS"
+          ) {
               throw "Backend smoke test did not report success."
           }
 
+          Write-Host ""
           Write-Host "Backend deployment validation passed."
 
       # ------------------------------------------------------
