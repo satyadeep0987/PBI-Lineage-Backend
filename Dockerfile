@@ -1,52 +1,81 @@
 # escape=`
 
 # ============================================================
-# Stage 1 - Python + backend dependencies
+# Stage 1 - CPython base
 # ============================================================
 
-FROM mcr.microsoft.com/windows/servercore:ltsc2025 AS builder
+FROM mcr.microsoft.com/windows/servercore:ltsc2025 AS python-base
 
 SHELL ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
 
-WORKDIR C:\app
-
-ENV UV_UNMANAGED_INSTALL="C:\uv"
-ENV UV_PYTHON_INSTALL_DIR="C:\python"
-ENV UV_PROJECT_ENVIRONMENT="C:\app\.venv"
-ENV UV_CACHE_DIR="C:\uv-cache"
-ENV UV_NO_MODIFY_PATH="1"
+ARG PYTHON_VERSION=3.13.15
+ARG PYTHON_INSTALLER_SHA256=edec09c4853aeae9ac36efb8c9f95b6b8e2fee65eee56d9767a8b7c69c574403
+ENV PYTHON_HOME="C:\Python313"
 
 # ------------------------------------------------------------
-# Install uv
+# Install official CPython with pip
 # ------------------------------------------------------------
 
-RUN Invoke-WebRequest `
+RUN $installerUrl = `
+        'https://www.python.org/ftp/python/{0}/python-{0}-amd64.exe' `
+        -f $env:PYTHON_VERSION; `
+    Invoke-WebRequest `
         -UseBasicParsing `
-        https://astral.sh/uv/0.12.6/install.ps1 `
-        -OutFile C:\uv-install.ps1; `
-    & C:\uv-install.ps1; `
-    Remove-Item C:\uv-install.ps1 -Force; `
-    & C:\uv\uv.exe --version; `
+        -Uri $installerUrl `
+        -OutFile C:\python-installer.exe; `
+    $actualHash = (Get-FileHash C:\python-installer.exe -Algorithm SHA256).Hash; `
+    if ($actualHash -ne $env:PYTHON_INSTALLER_SHA256) { `
+        throw ('Python installer SHA-256 mismatch: {0}' -f $actualHash) `
+    }; `
+    $process = Start-Process `
+        -FilePath C:\python-installer.exe `
+        -ArgumentList `
+            '/quiet', `
+            'InstallAllUsers=1', `
+            'TargetDir=C:\Python313', `
+            'Include_launcher=0', `
+            'Include_pip=1', `
+            'Include_test=0', `
+            'PrependPath=0', `
+            'Shortcuts=0' `
+        -Wait `
+        -PassThru; `
+    if (($process.ExitCode -ne 0) -and ($process.ExitCode -ne 3010)) { `
+        throw ( `
+            'Python installation failed with exit code {0}' `
+            -f $process.ExitCode `
+        ) `
+    }; `
+    Remove-Item C:\python-installer.exe -Force
+
+RUN & (Join-Path $env:PYTHON_HOME 'python.exe') --version; `
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; `
+    & (Join-Path $env:PYTHON_HOME 'python.exe') -m pip --version; `
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-# ------------------------------------------------------------
-# Install Python
-# ------------------------------------------------------------
 
-RUN & C:\uv\uv.exe python install 3.11.16; `
+# ============================================================
+# Stage 2 - Backend dependencies
+# ============================================================
+
+FROM python-base AS builder
+
+WORKDIR C:\app
+
+RUN & (Join-Path $env:PYTHON_HOME 'python.exe') -m venv C:\app\.venv; `
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # ------------------------------------------------------------
 # Install project dependencies
 # ------------------------------------------------------------
 
-COPY pyproject.toml uv.lock ./
+COPY requirements.txt constraints.txt ./
 
-RUN & C:\uv\uv.exe sync `
-        --frozen `
-        --no-dev `
-        --no-install-project `
-        --python 3.11.16; `
+RUN & 'C:\app\.venv\Scripts\python.exe' `
+        -m pip install `
+        --disable-pip-version-check `
+        --no-cache-dir `
+        --requirement requirements.txt; `
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # ------------------------------------------------------------
@@ -60,10 +89,10 @@ RUN & 'C:\app\.venv\Scripts\python.exe' `
 
 
 # ============================================================
-# Stage 2 - Runtime
+# Stage 3 - Runtime
 # ============================================================
 
-FROM mcr.microsoft.com/windows/servercore:ltsc2025 AS runtime
+FROM python-base AS runtime
 
 SHELL ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
 
@@ -100,10 +129,9 @@ RUN if ([string]::IsNullOrWhiteSpace($env:MSOLAP_MSI_URL)) { `
     Remove-Item C:\msolap.msi -Force
 
 # ------------------------------------------------------------
-# Copy Python and virtual environment from builder
+# Copy virtual environment from builder
 # ------------------------------------------------------------
 
-COPY --from=builder C:\python C:\python
 COPY --from=builder C:\app\.venv C:\app\.venv
 
 # ------------------------------------------------------------
