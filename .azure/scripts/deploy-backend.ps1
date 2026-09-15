@@ -192,7 +192,7 @@ $env:LOG_LEVEL = "INFO"
 
 $env:LINEAGE_DATABASE_PATH = "data/lineage.db"
 
-$env:SNOWFLAKE_ALLOW_EXTERNAL_BROWSER_AUTH = "false"
+$env:SNOWFLAKE_ALLOW_EXTERNAL_BROWSER_AUTH = "true"
 
 # These fields are list[str] in Pydantic.
 # They MUST remain valid JSON strings.
@@ -208,7 +208,7 @@ $env:ALLOWED_HOSTS = (
 # HTTPS terminates at Cloudflare/IIS.
 $env:FORCE_HTTPS = "false"
 
-$env:ENABLE_API_DOCS = "false"
+$env:ENABLE_API_DOCS = "true"
 
 $env:AUTH_COOKIE_SECURE = "true"
 $env:AUTH_COOKIE_SAMESITE = "lax"
