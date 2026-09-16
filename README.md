@@ -84,6 +84,13 @@ Current capabilities:
   payloads or graph storage.
 - Provides configurable API-key enforcement, secure headers/cookies, trusted
   hosts, request-size limits, readiness checks, and Prometheus-format metrics.
+- Exposes an authenticated, evidence-grounded Power AI (`/ai/status`,
+  `/ai/chat`, `/ai/chat/stream`) that explains — and never invents — facts a
+  deterministic Measure/Report/Impact agent gathers from the existing
+  lineage services; the model is skipped entirely whenever evidence is
+  insufficient, ambiguous, or conflicting. Provider-independent
+  (OpenAI/Anthropic/Gemini/Azure OpenAI/a local fake provider, switchable by
+  configuration alone) and disabled by default (see "Power AI" below).
 
 Remaining acceptance and scale work:
 
@@ -100,9 +107,19 @@ Remaining acceptance and scale work:
 - Automate ECS task-definition registration and service rollout after an
   immutable Amazon ECR image is published.
 - Add production high availability, alarms, and autoscaling.
+- Power AI: persist conversation history (currently request-scoped only, so
+  cross-turn pronoun resolution like "that measure" is not implemented), add
+  an LLM fallback router for genuinely ambiguous intent, add Snowflake-backed
+  evidence tools, wire live TMDL-vs-XMLA conflict checking into the default
+  request path (currently opt-in only, since XMLA needs a Windows/MSOLAP
+  host), and add a standing evaluation-fixture suite. The
+  Measure/Report/Impact agents, tool registry, grounded composer, grounding
+  validator, and deterministic fallback renderer are implemented and tested.
 
-PowerAI is intentionally deferred until the backend and frontend lineage
-workflows are complete. No PowerAI endpoint or service is included in this phase.
+Power AI is being introduced in controlled phases; only its
+provider-independent foundation is included in this phase (see "Power AI"
+below). It never derives lineage facts itself — it explains facts the
+existing deterministic lineage engine already computed.
 
 ## Technology Stack
 
@@ -111,6 +128,7 @@ workflows are complete. No PowerAI endpoint or service is included in this phase
 - Pydantic / Pydantic Settings
 - httpx
 - MSAL
+- LiteLLM (provider-neutral LLM adapter for Power AI)
 - Snowflake Connector for Python
 - Snowpark Python
 - cryptography for in-memory RSA key loading
@@ -257,6 +275,13 @@ AUTH_COOKIE_SECURE=false
 AUTH_COOKIE_SAMESITE=lax
 MAX_REQUEST_BODY_BYTES=10485760
 EXPOSE_METRICS=true
+AI_ENABLED=false
+AI_PROVIDER=fake
+AI_MODEL=fake-model
+AI_TEMPERATURE=0.1
+AI_MAX_TOKENS=4000
+AI_REQUEST_TIMEOUT_SECONDS=30
+AI_STREAMING_ENABLED=true
 ```
 
 `MICROSOFT_SSO_REDIRECT_URI` is only required to enable
@@ -287,6 +312,22 @@ Analysis Services OLE DB Provider (`MSOLAP`) installed. The backend opens an
 DB connection string. The production Dockerfile supplies and verifies these
 Windows dependencies in a Windows Server Core LTSC 2025 container. Live XMLA
 still needs a Power BI/Fabric capacity with XMLA enabled and a permitted user.
+
+Power AI (`AI_*`) is disabled by default (`AI_ENABLED=false`) and defaults to
+the network-free `fake` provider even when enabled, so existing deployments
+are unaffected unless explicitly configured. Set `AI_PROVIDER` to `openai`,
+`anthropic`, `gemini`, or `azure_openai` and provide only that provider's
+credential (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or
+`AZURE_OPENAI_API_KEY`); `AI_API_BASE`/`AI_API_VERSION` are for Azure
+OpenAI/Ollama-style custom endpoints. Provider switching never requires
+rewriting agents, tools, endpoints, or evidence schemas — only these
+settings change. The first request to a real (non-`fake`) provider on a
+fresh host may require one-time outbound HTTPS access to
+`openaipublic.blob.core.windows.net` for LiteLLM's bundled tokenizer data;
+this is unrelated to chat completions themselves (token usage is read from
+each provider's own API response) and is normally satisfied once during
+image build, not at request time. See "Power AI" below for the current
+scope.
 
 ## API Overview
 
@@ -811,10 +852,121 @@ hierarchies, hierarchy levels, partitions, and relationships by normalized
 identity and reports `matched`, `definition_only`, or `xmla_only`. TMDL source
 paths remain the definition evidence; XMLA provides runtime metadata.
 
+### Power AI
+
+```text
+GET  /api/v1/ai/status
+POST /api/v1/ai/chat
+POST /api/v1/ai/chat/stream
+```
+
+**Core rule: no verified evidence, no factual answer.** Power AI never
+derives lineage, DAX, sources, dependencies, or impact itself — every fact
+in a response is traced to one deterministic backend call (semantic model
+parsing, the lineage graph, impact analysis, report definitions). If the
+backend cannot prove an answer, the response says so
+(`status: "insufficient_evidence"`) and the language model is **never
+invoked** to guess. All three routes require the same authenticated Power BI
+session as every other route (`get_powerbi_access_token`, plus an optional
+Fabric session for anything needing report/semantic-model definitions) and
+`X-Lineage-Admin-Key` when `LINEAGE_ADMIN_API_KEY` is configured.
+
+`GET /ai/status` is unchanged: `{enabled, provider, model,
+streaming_enabled, configured}`, never the credential itself.
+
+`POST /ai/chat` accepts `message`, `conversation_id`, `audience`
+(`general`/`business`/`developer`), and `context` (`workspace_id`,
+`report_id`, `semantic_model_id`, `object_type`, `object_id`,
+`object_name`). Client-supplied IDs are never trusted directly —
+`AIContextResolver` re-validates workspace/report/semantic-model access
+through the real Power BI/Fabric services before anything is used as
+evidence, and a well-formed but inaccessible (e.g. cross-tenant) GUID is
+rejected identically to a nonexistent one. The response is:
+
+```json
+{
+  "conversation_id": "...",
+  "status": "answered",
+  "answer": "...",
+  "claims": [{"text": "...", "evidence_ids": ["E1", "E2"]}],
+  "evidence": [{"evidence_id": "E1", "object_type": "measure", "fact_type": "definition", "source_type": "tmdl", "value": "...", "verification_status": "verified", "...": "..."}],
+  "agent": "measure_agent",
+  "suggested_questions": ["..."],
+  "usage": {"provider": "...", "model": "...", "tokens": 0}
+}
+```
+
+`status` is one of `answered`, `insufficient_evidence`, `ambiguous`,
+`conflicting_evidence`, or `out_of_scope`. Only `answered` ever has a
+non-null `usage` — every other status means the model was never called.
+`claims` is only populated when the model successfully produced a
+citation-backed answer; `evidence` is always populated when evidence
+exists, independent of whether the model was used, so the frontend can show
+its own evidence view even on a fallback answer.
+
+Pipeline: `AIContextResolver` (validate + fetch) → `Supervisor`
+(deterministic keyword/object-type routing into
+`measure_agent`/`report_agent`/`impact_agent` — an LLM router is not needed
+yet since every intent this phase implements routes deterministically) →
+agent (calls a small set of registered, read-only tools —
+`app/ai/tools/registry.py` — that wrap `SemanticModelDefinitionService`,
+`LineageGraphService`, `ImpactAnalysisService`,
+`LineageNavigationService`/`LineageSearchService`,
+`ReportDefinitionService`/`ReportSemanticLineageService`,
+`PhysicalSourceDiscoveryService`; no lineage algorithm is reimplemented) →
+`EvidenceBundle`. If `can_answer` is false, the response is rendered
+directly from the bundle and the model is skipped entirely. Otherwise the
+`GroundedComposer` asks the model for a structured `{summary, claims}` JSON
+object citing evidence IDs (via `ModelGateway.generate()` — no
+provider-specific structured-output feature, so this works identically for
+every provider), and `GroundedResponseValidator` mechanically rejects the
+whole response if any claim has no citation or cites an evidence ID that
+does not exist in the bundle — it never strips a bad citation and keeps the
+sentence. On rejection (or any composer/provider failure),
+`DeterministicAnswerRenderer` renders the answer directly from the evidence
+instead, so a factual answer still reaches the caller even when model
+composition breaks. If a semantic model's TMDL definition and live XMLA
+metadata disagree on a measure's DAX, the response is
+`conflicting_evidence` with both values — never a silent pick.
+
+`POST /ai/chat/stream` (SSE, `text/event-stream`) runs the exact same
+pipeline to a fully validated response **before** sending anything —
+grounding always happens before streaming, never token-by-token
+speculative output. Events, in order: `metadata` (conversation id, status,
+agent) → `evidence` → one or more `delta` (the already-validated answer
+text, chunked) → `complete` (claims/usage/suggested_questions — the answer
+text itself is not repeated) → `error` on any failure instead of `complete`.
+
+Provider switching (OpenAI/Anthropic/Gemini/Azure OpenAI/a local `fake`
+provider) is an `AI_PROVIDER`/`AI_MODEL`/credential configuration change
+only; no endpoint, schema, agent, or tool differs by provider. Every
+provider except `fake` is reached through one adapter
+(`LiteLLMModelGateway`); no vendor SDK is imported outside that one file,
+and LiteLLM itself is imported lazily (only when a real provider is
+actually used) so the application's startup, `/ai/status`, and the default
+`fake` provider never depend on it being importable.
+
+Known limitations in this phase: conversation history is not yet persisted,
+so cross-turn pronoun resolution ("what depends on *that* measure") is not
+implemented — each request is resolved independently; intent routing is
+deterministic only (no LLM fallback router, since nothing implemented yet
+needs one); Snowflake-backed evidence tools are not included; a standing
+evaluation-fixture suite is not included (covered instead by the unit/API
+tests under `tests/unit/test_ai_*.py`).
+
 ## Folder Structure
 
 ```text
 app/
+  ai/
+    models/
+    context/
+    tools/
+    orchestration/
+    agents/
+    composition/
+    providers/
+    services/
   api/
   clients/
   core/
@@ -894,6 +1046,10 @@ FastAPI routing layer.
   - Unified DAX, physical-source, Snowflake normalization, supplied-evidence
     and live graph, deep Snowflake table/column tracing, impact, search,
     navigation, versioning, validation, estate, and scan-job endpoints.
+- `app/api/v1/ai.py`
+  - Power AI status and chat endpoints. Router-level lineage-admin-key gate
+    plus per-route authenticated Power BI session, matching every other
+    subsystem's auth conventions.
 - `app/api/dependencies/credentials.py`
   - FastAPI dependencies for extracting Power BI/Fabric credentials and the
     Snowflake connector-session ID from their separate HttpOnly cookies.
@@ -901,6 +1057,87 @@ FastAPI routing layer.
   - Singleton lineage repository, cache/store, and scan-manager dependencies.
 - `app/api/dependencies/security.py`
   - Optional constant-time lineage administration API-key enforcement.
+
+### `app/ai`
+
+Power AI. Never a second source of truth for lineage: only `app/core` and
+`app/services`/`app/schemas` (read-only, via the tool layer) are dependencies
+— no lineage/DAX/impact algorithm is reimplemented here. No vendor SDK is
+imported outside `providers/litellm_gateway.py`.
+
+- `app/ai/models/enums.py`
+  - `AudienceType`, `MessageRole`, `AIAnswerStatus`
+    (`answered`/`insufficient_evidence`/`ambiguous`/`conflicting_evidence`/`out_of_scope`),
+    `VerificationStatus`, `AIIntent`.
+- `app/ai/models/messages.py`, `requests.py`
+  - Provider-neutral `ModelMessage`/`ModelRequest` plus the public
+    `AIChatRequest`/`AIChatContext` API contract.
+- `app/ai/models/responses.py`
+  - Provider-neutral `ModelResponse`/`ModelChunk`/`TokenUsage`, plus the
+    public `AIStatusResponse`/`AIUsage`/`AIChatResponse`
+    (`status`/`claims`/`evidence`/`agent`/`suggested_questions`/`usage`).
+- `app/ai/models/context.py`
+  - `ResolvedObject`/`ResolvedAIContext` — the access-checked, evidence-
+    carrying context every tool/agent reads from instead of raw client input.
+- `app/ai/models/evidence.py`
+  - `EvidenceItem` (one fact traced to one deterministic call),
+    `EvidenceConflict`, `EvidenceBundle`, `GroundedClaim`.
+- `app/ai/context/resolver.py`
+  - `AIContextResolver`: validates workspace/report/semantic-model access
+    against the caller's real Power BI/Fabric session (never trusts a
+    client-supplied ID directly; a forbidden and a nonexistent ID fail
+    identically) and resolves a named object via `LineageSearchService`
+    against a graph built from already-fetched evidence. Also exports
+    `build_lineage_graph`, the single call site every tool shares.
+- `app/ai/tools/`
+  - `base.py` (`Tool` dataclass — explicit name/description/required-context/
+    handler, no dynamic dispatch), `registry.py` (`TOOL_REGISTRY`),
+    `measure_tools.py`, `report_tools.py`, `lineage_tools.py`,
+    `impact_tools.py` — thin adapters over
+    `SemanticModelDefinitionService`/`LineageGraphService`/
+    `ImpactAnalysisService`/`LineageNavigationService`/
+    `ReportSemanticLineageService`/`PhysicalSourceDiscoveryService`,
+    returning `EvidenceItem`s only.
+- `app/ai/orchestration/intent.py`, `supervisor.py`
+  - Deterministic keyword/object-type intent classification and the
+    `Supervisor` that picks one agent from it — no model call.
+- `app/ai/agents/measure_agent.py`, `report_agent.py`, `impact_agent.py`
+  - Each calls a small, fixed set of tools and assembles one
+    `EvidenceBundle`, including the measure agent's TMDL-vs-XMLA conflict
+    check (opt-in — only runs when XMLA metadata is explicitly supplied).
+- `app/ai/composition/`
+  - `persona.py` (presentation-only per-audience hints), `grounded_composer.py`
+    (prompt-based structured JSON via `ModelGateway.generate()`, Pydantic-
+    validated — no provider-specific structured output), `grounding_validator.py`
+    (`GroundedResponseValidator` — every claim must cite an evidence id that
+    exists in the bundle, or the whole response is rejected),
+    `deterministic_renderer.py` (`DeterministicAnswerRenderer` — renders
+    straight from the evidence bundle, used for every non-`answered` status
+    and as the fallback when composition/validation fails),
+    `suggested_questions.py` (deterministic, no model call).
+- `app/ai/providers/base.py`
+  - The `ModelGateway` `Protocol` (`generate`/`stream`) — unchanged since
+    the provider-independent foundation phase.
+- `app/ai/providers/fake_gateway.py`
+  - Deterministic, network-free `ModelGateway` selected by `AI_PROVIDER=fake`
+    (the default); keeps an unconfigured deployment fully functional and
+    testable.
+- `app/ai/providers/litellm_gateway.py`
+  - `ModelGateway` backed by LiteLLM's unified `acompletion()`/streaming API;
+    maps `litellm.exceptions.*` to normalized `AI*` application exceptions.
+    Imports `litellm` lazily inside its methods rather than at module load,
+    so application startup and every other AI provider never depend on it.
+- `app/ai/providers/factory.py`
+  - Builds the configured gateway from `Settings` and reports (without ever
+    returning it) whether a credential is present for the selected provider.
+- `app/ai/services/ai_service.py`
+  - Orchestrates the whole pipeline: resolver → supervisor/agent → no-
+    evidence gate (skips the model entirely when evidence is insufficient)
+    → grounded composer → validator → deterministic fallback. Emits
+    structured logs and grounding metrics at each stage.
+- `app/ai/services/streaming.py`
+  - SSE event generator for `/ai/chat/stream`; runs the same pipeline to a
+    fully validated response before emitting anything.
 
 ### `app/clients`
 
@@ -1241,6 +1478,49 @@ Automated tests.
     focused route selection, authentication dependencies, and validation.
 - `tests/unit/test_security_operations.py`
   - Security headers, API-key enforcement, body limits, readiness, and metrics.
+- `tests/unit/test_ai_fake_gateway.py`
+  - `FakeModelGateway` deterministic generate/stream behavior.
+- `tests/unit/test_ai_model_gateway.py`
+  - `LiteLLMModelGateway` request mapping, response/streaming normalization,
+    and provider-error-to-application-exception mapping. Skips cleanly
+    (without failing collection for the rest of the suite) if `litellm`
+    cannot be imported in the current environment.
+- `tests/unit/test_ai_service.py`
+  - `AI_ENABLED` gating, status reporting without secret exposure, the
+    no-evidence gate (asserts the gateway is never called), persona
+    presentation-only rendering, and simulated multi-provider independence.
+- `tests/unit/test_ai_context_resolver.py`
+  - Valid workspace/report/semantic-model resolution; inaccessible workspace,
+    out-of-workspace report, and unverifiable semantic model rejected;
+    forbidden vs. nonexistent workspace access fail identically; ambiguous
+    and unknown object names.
+- `tests/unit/test_ai_tools.py`
+  - Each registered tool against real parsed-semantic-model/report fixtures
+    — correct evidence, no invented facts when context is missing.
+- `tests/unit/test_ai_supervisor_routing.py`
+  - Deterministic intent classification and agent routing, including the
+    out-of-scope fallback.
+- `tests/unit/test_ai_measure_agent.py`, `test_ai_impact_agent.py`,
+  `test_ai_report_agent.py`
+  - Full evidence-bundle assembly per agent, including the TMDL-vs-XMLA
+    conflicting-evidence case for measures.
+- `tests/unit/test_ai_grounding.py`
+  - Grounded composer + validator: accepts well-formed cited claims;
+    rejects a hallucinated claim with no evidence ids; rejects a claim
+    citing a nonexistent evidence id; the deterministic fallback still
+    returns the exact DAX from evidence when composition is rejected.
+- `tests/unit/test_ai_fake_gateway.py`
+  - `FakeModelGateway` deterministic generate/stream behavior.
+- `tests/unit/test_ai_model_gateway.py`
+  - `LiteLLMModelGateway` request mapping, response/streaming normalization,
+    and provider-error-to-application-exception mapping. Skips cleanly
+    (without failing collection for the rest of the suite) if `litellm`
+    cannot be imported in the current environment.
+- `tests/api/test_ai_resources.py`
+  - `/ai/status`, `/ai/chat`, and `/ai/chat/stream` authentication,
+    `AI_DISABLED` handling, an end-to-end grounded measure answer with
+    mocked provider calls, and the SSE event sequence with no duplicated
+    final answer.
 
 ## Phase History
 
