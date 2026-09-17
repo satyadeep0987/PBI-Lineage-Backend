@@ -329,6 +329,38 @@ each provider's own API response) and is normally satisfied once during
 image build, not at request time. See "Power AI" below for the current
 scope.
 
+### GitHub production feature switches
+
+The Azure backend deployment reads two non-secret switches from the GitHub
+`production` environment. They are no longer hardcoded in the VM deployment
+script and both fail closed (`false`) when the variable is missing.
+
+| GitHub environment variable | Values | Recommended production value | Effect |
+| --- | --- | --- | --- |
+| `ENABLE_API_DOCS` | `true` or `false` | `false` unless operators need the live catalog | Controls FastAPI Swagger/ReDoc and `/openapi.json`. The frontend API Reference needs `/openapi.json` for the complete live operation list. |
+| `AI_ENABLED` | `true` or `false` | `false` until Power AI is approved | Controls `/api/v1/ai/chat` and `/api/v1/ai/chat/stream`. `/api/v1/ai/status` remains the frontend's source of truth. |
+
+Configure them in GitHub:
+
+1. Open the **PBI-Lineage-Backend** repository.
+2. Go to **Settings -> Environments -> production**.
+3. Under **Environment variables**, create `ENABLE_API_DOCS` and
+   `AI_ENABLED` using lowercase `true` or `false`.
+4. Run **Actions -> Backend CD -> Run workflow** from `main`, or merge a
+   commit that completes Backend CI while `DEPLOYMENT_ENABLED=true`.
+5. Verify Power AI with `GET /api/v1/ai/status`. Changing a GitHub variable
+   does not alter the already-running container until Backend CD redeploys it.
+
+The automated Azure deployment currently keeps `AI_PROVIDER=fake`, which is
+deterministic and requires no external API key. `AI_ENABLED=true` therefore
+enables the safe end-to-end Power AI path, not a paid external model. Before
+switching to a real provider, extend the deployment to load the selected
+provider credential from Azure Key Vault. Never put provider keys in GitHub
+variables, frontend `VITE_*` values, workflow logs, or source control.
+
+For local development, set the same backend values in `.env` and restart
+FastAPI. No frontend AI environment variable is required.
+
 ## API Overview
 
 All endpoints are mounted under `/api/v1`.
