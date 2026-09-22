@@ -27,6 +27,15 @@ _ALLOWED_EXTRA_FIELDS = {
     "duration_ms",
     "provider",
     "error_code",
+    "model",
+    "tokens",
+    "agent",
+    "conversation_id",
+    "intent",
+    "evidence_count",
+    "evidence_status",
+    "validation_result",
+    "fallback_used",
 }
 
 
